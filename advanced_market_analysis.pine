@@ -1,0 +1,865 @@
+//@version=5
+indicator("Advanced Market Analysis & Pattern Detection", shorttitle="AMA", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// I. USER INPUTS & CONFIGURATION (사용자 설정)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// --- Pattern Display Toggles ---
+var group_toggles = "Pattern Display Toggles"
+show_elliott = input.bool(true, title="Show Elliott Waves", group=group_toggles)
+show_elliott_impulse = input.bool(true, title="  ↳ Show Impulse Waves (1-5)", group=group_toggles)
+show_elliott_corrective = input.bool(true, title="  ↳ Show Corrective Waves (ABC)", group=group_toggles)
+show_elliott_connecting = input.bool(true, title="  ↳ Show Connecting Waves (WXY)", group=group_toggles)
+show_elliott_triangle = input.bool(true, title="  ↳ Show Triangle Waves (ABCDE)", group=group_toggles)
+show_truncated = input.bool(true, title="  ↳ Show Truncated Wave 5 (5T)", group=group_toggles)
+show_diagonal = input.bool(true, title="  ↳ Show Diagonal Patterns", group=group_toggles)
+
+show_harmonic = input.bool(true, title="Show Harmonic Patterns", group=group_toggles)
+show_wyckoff = input.bool(true, title="Show Wyckoff Phases", group=group_toggles)
+show_dow = input.bool(true, title="Show Dow Theory", group=group_toggles)
+show_master = input.bool(true, title="Show Master Pattern", group=group_toggles)
+
+// --- ZigZag Parameters ---
+var group_zigzag = "ZigZag Settings"
+zigzag_depth = input.int(12, title="ZigZag Depth", minval=1, group=group_zigzag, tooltip="Number of bars for pivot detection")
+zigzag_deviation = input.float(5.0, title="ZigZag Deviation %", minval=0.1, group=group_zigzag, tooltip="Minimum price change percentage")
+
+// --- Harmonic Pattern Parameters ---
+var group_harmonic = "Harmonic Pattern Settings"
+fib_tolerance = input.float(0.15, title="Fibonacci Tolerance", minval=0.05, maxval=0.30, step=0.01, group=group_harmonic, tooltip="Tolerance for Fibonacci ratio matching (±)")
+show_potential = input.bool(true, title="Show Potential Patterns", group=group_harmonic, tooltip="Display patterns in formation with dashed lines")
+
+// --- Color Settings ---
+var group_colors = "Color Settings"
+color_impulse = input.color(color.new(color.blue, 0), title="Impulse Wave Color", group=group_colors)
+color_corrective = input.color(color.new(color.red, 0), title="Corrective Wave Color", group=group_colors)
+color_harmonic = input.color(color.new(color.purple, 0), title="Harmonic Pattern Color", group=group_colors)
+color_wyckoff = input.color(color.new(color.orange, 0), title="Wyckoff Color", group=group_colors)
+color_dow = input.color(color.new(color.green, 0), title="Dow Theory Color", group=group_colors)
+color_master_contraction = input.color(color.new(color.yellow, 80), title="Master Pattern Contraction", group=group_colors)
+color_master_expansion = input.color(color.new(color.purple, 0), title="Master Pattern Expansion", group=group_colors)
+color_master_trend = input.color(color.new(color.teal, 0), title="Master Pattern Trend", group=group_colors)
+
+// --- Advanced Settings ---
+var group_advanced = "Advanced Settings"
+label_offset_multiplier = input.float(1.5, title="Label Spacing Multiplier", minval=0.5, maxval=5.0, step=0.1, group=group_advanced, tooltip="Adjust spacing between overlapping labels")
+debug_mode = input.bool(false, title="Debug Mode", group=group_advanced, tooltip="Enable debug logging")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// II. FIBONACCI RATIOS & CONSTANTS (피보나치 상수)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var float FIB_0236 = 0.236
+var float FIB_0382 = 0.382
+var float FIB_0500 = 0.500
+var float FIB_0618 = 0.618
+var float FIB_0786 = 0.786
+var float FIB_0886 = 0.886
+var float FIB_1000 = 1.000
+var float FIB_1130 = 1.130
+var float FIB_1272 = 1.272
+var float FIB_1414 = 1.414
+var float FIB_1618 = 1.618
+var float FIB_2000 = 2.000
+var float FIB_2240 = 2.240
+var float FIB_2618 = 2.618
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// III. ZIGZAG CALCULATION (지그재그 계산)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ZigZag Pivot Detection
+f_pivothigh(len) =>
+    ta.pivothigh(high, len, len)
+
+f_pivotlow(len) =>
+    ta.pivotlow(low, len, len)
+
+// ZigZag State Variables
+var float[] zz_price = array.new_float(0)
+var int[] zz_bar = array.new_int(0)
+var int[] zz_direction = array.new_int(0) // 1 = high, -1 = low
+
+// Calculate ZigZag
+var float last_pivot_price = na
+var int last_pivot_bar = na
+var int last_pivot_dir = na
+
+ph = f_pivothigh(zigzag_depth)
+pl = f_pivotlow(zigzag_depth)
+
+if not na(ph)
+    price_change = na(last_pivot_price) ? 100.0 : math.abs((ph - last_pivot_price) / last_pivot_price * 100)
+    if na(last_pivot_dir) or last_pivot_dir == -1
+        if na(last_pivot_price) or price_change >= zigzag_deviation
+            array.push(zz_price, ph)
+            array.push(zz_bar, bar_index - zigzag_depth)
+            array.push(zz_direction, 1)
+            last_pivot_price := ph
+            last_pivot_bar := bar_index - zigzag_depth
+            last_pivot_dir := 1
+            if array.size(zz_price) > 100
+                array.shift(zz_price)
+                array.shift(zz_bar)
+                array.shift(zz_direction)
+    else if last_pivot_dir == 1
+        if ph > last_pivot_price
+            array.set(zz_price, array.size(zz_price) - 1, ph)
+            array.set(zz_bar, array.size(zz_bar) - 1, bar_index - zigzag_depth)
+            last_pivot_price := ph
+            last_pivot_bar := bar_index - zigzag_depth
+
+if not na(pl)
+    price_change = na(last_pivot_price) ? 100.0 : math.abs((pl - last_pivot_price) / last_pivot_price * 100)
+    if na(last_pivot_dir) or last_pivot_dir == 1
+        if na(last_pivot_price) or price_change >= zigzag_deviation
+            array.push(zz_price, pl)
+            array.push(zz_bar, bar_index - zigzag_depth)
+            array.push(zz_direction, -1)
+            last_pivot_price := pl
+            last_pivot_bar := bar_index - zigzag_depth
+            last_pivot_dir := -1
+            if array.size(zz_price) > 100
+                array.shift(zz_price)
+                array.shift(zz_bar)
+                array.shift(zz_direction)
+    else if last_pivot_dir == -1
+        if pl < last_pivot_price
+            array.set(zz_price, array.size(zz_price) - 1, pl)
+            array.set(zz_bar, array.size(zz_bar) - 1, bar_index - zigzag_depth)
+            last_pivot_price := pl
+            last_pivot_bar := bar_index - zigzag_depth
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IV. HELPER FUNCTIONS (헬퍼 함수)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Check if value is within tolerance of target
+f_within_tolerance(value, target, tolerance) =>
+    math.abs(value - target) <= tolerance
+
+// Calculate retracement ratio
+f_retracement(a, b, c) =>
+    math.abs((c - b) / (a - b))
+
+// Calculate extension ratio
+f_extension(a, b, c) =>
+    math.abs((c - b) / (a - b))
+
+// Get ATR for label offset calculation
+atr_value = ta.atr(14)
+
+// Calculate label offset based on direction
+f_label_offset(is_bullish, multiplier=1.0) =>
+    offset = atr_value * label_offset_multiplier * multiplier
+    is_bullish ? offset : -offset
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// V. ELLIOTT WAVE DETECTION (엘리엇 파동 탐지)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Detect Impulse Waves (1, 2, 3, 4, 5)
+f_detect_impulse_wave() =>
+    if array.size(zz_price) >= 6 and show_elliott and show_elliott_impulse
+        size = array.size(zz_price)
+
+        // Get last 6 pivots (for 5-wave pattern)
+        p0 = array.get(zz_price, size - 6)
+        p1 = array.get(zz_price, size - 5)
+        p2 = array.get(zz_price, size - 4)
+        p3 = array.get(zz_price, size - 3)
+        p4 = array.get(zz_price, size - 2)
+        p5 = array.get(zz_price, size - 1)
+
+        b0 = array.get(zz_bar, size - 6)
+        b1 = array.get(zz_bar, size - 5)
+        b2 = array.get(zz_bar, size - 4)
+        b3 = array.get(zz_bar, size - 5)
+        b4 = array.get(zz_bar, size - 2)
+        b5 = array.get(zz_bar, size - 1)
+
+        d0 = array.get(zz_direction, size - 6)
+
+        // Check for bullish impulse (starting from low)
+        is_bullish = d0 == -1
+
+        // Impulse wave rules:
+        // - Wave 2 cannot retrace more than 100% of wave 1
+        // - Wave 3 cannot be the shortest
+        // - Wave 4 cannot overlap wave 1
+
+        wave1 = math.abs(p1 - p0)
+        wave2 = math.abs(p2 - p1)
+        wave3 = math.abs(p3 - p2)
+        wave4 = math.abs(p4 - p3)
+        wave5 = math.abs(p5 - p4)
+
+        // Check wave 2 retracement
+        retrace2 = wave2 / wave1
+        valid_wave2 = retrace2 < 1.0
+
+        // Check wave 3 is not shortest
+        valid_wave3 = wave3 > wave1 or wave3 > wave5
+
+        // Check wave 4 doesn't overlap wave 1
+        valid_wave4 = is_bullish ? (p4 > p1) : (p4 < p1)
+
+        // Check for truncated wave 5
+        is_truncated = is_bullish ? (p5 < p3) : (p5 > p3)
+
+        // Check for diagonal (wave 3 is not longest)
+        is_diagonal = not (wave3 > wave1 and wave3 > wave5)
+
+        if valid_wave2 and valid_wave3 and valid_wave4
+            // Draw impulse wave lines
+            line.new(b0, p0, b1, p1, color=color_impulse, width=2)
+            line.new(b1, p1, b2, p2, color=color_impulse, width=2)
+            line.new(b2, p2, b3, p3, color=color_impulse, width=2)
+            line.new(b3, p3, b4, p4, color=color_impulse, width=2)
+            line.new(b4, p4, b5, p5, color=color_impulse, width=2)
+
+            // Place labels
+            label.new(b1, p1, "①", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse, textcolor=color.white, size=size.normal)
+            label.new(b2, p2, "②", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_impulse, textcolor=color.white, size=size.normal)
+            label.new(b3, p3, "③", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse, textcolor=color.white, size=size.normal)
+            label.new(b4, p4, "④", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_impulse, textcolor=color.white, size=size.normal)
+
+            // Label wave 5 (or 5T if truncated)
+            if is_truncated and show_truncated
+                label.new(b5, p5, "⑤T", style=is_bullish ? label.style_label_up : label.style_label_down, color=color.new(color_impulse, 0), textcolor=color.white, size=size.normal)
+                // Add truncation annotation
+                line.new(b3, p3, b5, p5, color=color_impulse, width=1, style=line.style_dashed)
+                label.new(b5, p5 + (is_bullish ? atr_value : -atr_value), "Truncated 5", style=label.style_none, color=color.new(color.white, 100), textcolor=color_impulse, size=size.small)
+            else
+                label.new(b5, p5, "⑤", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse, textcolor=color.white, size=size.normal)
+
+            // Check and label diagonal
+            if is_diagonal and show_diagonal
+                label.new(b3, p3 + (is_bullish ? atr_value * 2 : -atr_value * 2), "Diagonal", style=label.style_none, color=color.new(color.white, 100), textcolor=color_impulse, size=size.small)
+
+// Detect Corrective Waves (ABC)
+f_detect_corrective_wave() =>
+    if array.size(zz_price) >= 4 and show_elliott and show_elliott_corrective
+        size = array.size(zz_price)
+
+        // Get last 4 pivots (for ABC pattern)
+        p0 = array.get(zz_price, size - 4)
+        p1 = array.get(zz_price, size - 3)
+        p2 = array.get(zz_price, size - 2)
+        p3 = array.get(zz_price, size - 1)
+
+        b0 = array.get(zz_bar, size - 4)
+        b1 = array.get(zz_bar, size - 3)
+        b2 = array.get(zz_bar, size - 2)
+        b3 = array.get(zz_bar, size - 1)
+
+        d0 = array.get(zz_direction, size - 4)
+        is_bullish = d0 == 1 // Corrective after bullish move
+
+        // Check if this is a completed correction
+        waveA = math.abs(p1 - p0)
+        waveB = math.abs(p2 - p1)
+        waveC = math.abs(p3 - p2)
+
+        // Basic ABC validation
+        if waveA > 0 and waveB > 0 and waveC > 0
+            // Determine if pattern is completed (solid) or in progress (dashed)
+            is_completed = bar_index - b3 > zigzag_depth * 2
+            line_style = is_completed ? line.style_solid : line.style_dashed
+
+            // Draw corrective wave lines
+            line.new(b0, p0, b1, p1, color=color_corrective, width=2, style=line_style)
+            line.new(b1, p1, b2, p2, color=color_corrective, width=2, style=line_style)
+            line.new(b2, p2, b3, p3, color=color_corrective, width=2, style=line_style)
+
+            // Place labels
+            label.new(b1, p1, "A", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.normal)
+            label.new(b2, p2, "B", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective, textcolor=color.white, size=size.normal)
+            label.new(b3, p3, "C", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.normal)
+
+// Detect Connecting Waves (WXY)
+f_detect_connecting_wave_wxy() =>
+    if array.size(zz_price) >= 6 and show_elliott and show_elliott_connecting
+        size = array.size(zz_price)
+
+        // Get last 6 pivots for WXY pattern
+        p0 = array.get(zz_price, size - 6)
+        p1 = array.get(zz_price, size - 5)
+        p2 = array.get(zz_price, size - 4)
+        p3 = array.get(zz_price, size - 3)
+        p4 = array.get(zz_price, size - 2)
+        p5 = array.get(zz_price, size - 1)
+
+        b0 = array.get(zz_bar, size - 6)
+        b1 = array.get(zz_bar, size - 5)
+        b2 = array.get(zz_bar, size - 4)
+        b3 = array.get(zz_bar, size - 3)
+        b4 = array.get(zz_bar, size - 2)
+        b5 = array.get(zz_bar, size - 1)
+
+        d0 = array.get(zz_direction, size - 6)
+        is_bullish = d0 == -1
+
+        // WXY structure: W (3 waves), X (connector), Y (3 waves)
+        // Simplified: each segment is a corrective structure
+
+        // Draw lines
+        line.new(b0, p0, b2, p2, color=color_corrective, width=1, style=line.style_solid)
+        line.new(b2, p2, b4, p4, color=color_corrective, width=1, style=line.style_dashed)
+        line.new(b4, p4, b5, p5, color=color_corrective, width=1, style=line.style_solid)
+
+        // Place labels
+        label.new(b2, p2, "W", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.small)
+        label.new(b3, p3, "X", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective, textcolor=color.white, size=size.small)
+        label.new(b5, p5, "Y", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.small)
+
+// Detect Triangle Waves (ABCDE)
+f_detect_triangle_wave() =>
+    if array.size(zz_price) >= 6 and show_elliott and show_elliott_triangle
+        size = array.size(zz_price)
+
+        // Get last 6 pivots for triangle pattern (5 points + origin)
+        p0 = array.get(zz_price, size - 6)
+        p1 = array.get(zz_price, size - 5)
+        p2 = array.get(zz_price, size - 4)
+        p3 = array.get(zz_price, size - 3)
+        p4 = array.get(zz_price, size - 2)
+        p5 = array.get(zz_price, size - 1)
+
+        b0 = array.get(zz_bar, size - 6)
+        b1 = array.get(zz_bar, size - 5)
+        b2 = array.get(zz_bar, size - 4)
+        b3 = array.get(zz_bar, size - 3)
+        b4 = array.get(zz_bar, size - 2)
+        b5 = array.get(zz_bar, size - 1)
+
+        d0 = array.get(zz_direction, size - 6)
+        is_bullish = d0 == 1
+
+        // Calculate ranges to detect converging/expanding
+        range1 = math.abs(p1 - p0)
+        range2 = math.abs(p2 - p1)
+        range3 = math.abs(p3 - p2)
+        range4 = math.abs(p4 - p3)
+        range5 = math.abs(p5 - p4)
+
+        // Check if converging (each swing smaller)
+        is_converging = range5 < range4 and range4 < range3 and range3 < range2
+
+        // Check if expanding (each swing larger)
+        is_expanding = range5 > range4 and range4 > range3 and range3 > range2
+
+        if is_converging or is_expanding
+            // Draw triangle lines
+            line.new(b0, p0, b1, p1, color=color_corrective, width=1)
+            line.new(b1, p1, b2, p2, color=color_corrective, width=1)
+            line.new(b2, p2, b3, p3, color=color_corrective, width=1)
+            line.new(b3, p3, b4, p4, color=color_corrective, width=1)
+            line.new(b4, p4, b5, p5, color=color_corrective, width=1)
+
+            // Place labels
+            label.new(b1, p1, "A", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.small)
+            label.new(b2, p2, "B", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective, textcolor=color.white, size=size.small)
+            label.new(b3, p3, "C", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.small)
+            label.new(b4, p4, "D", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective, textcolor=color.white, size=size.small)
+            label.new(b5, p5, "E", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.small)
+
+            // Add pattern type label
+            if is_expanding
+                label.new(b3, p3 + (is_bullish ? -atr_value * 2 : atr_value * 2), "Expanding Triangle", style=label.style_none, textcolor=color_corrective, size=size.small)
+            else
+                label.new(b3, p3 + (is_bullish ? -atr_value * 2 : atr_value * 2), "Converging Triangle", style=label.style_none, textcolor=color_corrective, size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VI. HARMONIC PATTERN DETECTION (하모닉 패턴 탐지)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Detect Gartley Pattern
+f_detect_gartley() =>
+    if array.size(zz_price) >= 5 and show_harmonic
+        size = array.size(zz_price)
+
+        // XABCD points
+        x = array.get(zz_price, size - 5)
+        a = array.get(zz_price, size - 4)
+        b = array.get(zz_price, size - 3)
+        c = array.get(zz_price, size - 2)
+        d = array.get(zz_price, size - 1)
+
+        bx = array.get(zz_bar, size - 5)
+        ba = array.get(zz_bar, size - 4)
+        bb = array.get(zz_bar, size - 3)
+        bc = array.get(zz_bar, size - 2)
+        bd = array.get(zz_bar, size - 1)
+
+        // Calculate ratios
+        xab = f_retracement(x, a, b)
+        abc = f_retracement(a, b, c)
+        bcd = f_retracement(b, c, d)
+        xad = f_retracement(x, a, d)
+
+        // Gartley ratios:
+        // XAB = 0.618
+        // ABC = 0.382 - 0.886
+        // BCD = 1.13 - 1.618
+        // XAD = 0.786
+
+        is_gartley = f_within_tolerance(xab, FIB_0618, fib_tolerance) and
+                     (abc >= FIB_0382 - fib_tolerance and abc <= FIB_0886 + fib_tolerance) and
+                     (bcd >= FIB_1130 - fib_tolerance and bcd <= FIB_1618 + fib_tolerance) and
+                     f_within_tolerance(xad, FIB_0786, fib_tolerance)
+
+        is_potential = (not is_gartley) and show_potential and
+                       f_within_tolerance(xab, FIB_0618, fib_tolerance * 1.5)
+
+        if is_gartley or is_potential
+            line_style = is_gartley ? line.style_solid : line.style_dashed
+            pattern_label = is_gartley ? "Gartley" : "Potential Gartley"
+
+            // Draw pattern
+            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
+
+            // Draw XB and AC lines
+            line.new(bx, x, bb, b, color=color.new(color_harmonic, 70), width=1, style=line.style_dotted)
+            line.new(ba, a, bc, c, color=color.new(color_harmonic, 70), width=1, style=line.style_dotted)
+
+            is_bullish = a > x
+
+            // Labels
+            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
+
+// Detect Butterfly Pattern
+f_detect_butterfly() =>
+    if array.size(zz_price) >= 5 and show_harmonic
+        size = array.size(zz_price)
+
+        x = array.get(zz_price, size - 5)
+        a = array.get(zz_price, size - 4)
+        b = array.get(zz_price, size - 3)
+        c = array.get(zz_price, size - 2)
+        d = array.get(zz_price, size - 1)
+
+        bx = array.get(zz_bar, size - 5)
+        ba = array.get(zz_bar, size - 4)
+        bb = array.get(zz_bar, size - 3)
+        bc = array.get(zz_bar, size - 2)
+        bd = array.get(zz_bar, size - 1)
+
+        xab = f_retracement(x, a, b)
+        abc = f_retracement(a, b, c)
+        bcd = f_extension(b, c, d)
+        xad = f_extension(x, a, d)
+
+        // Butterfly ratios:
+        // XAB = 0.786
+        // ABC = 0.382 - 0.886
+        // BCD = 1.618 - 2.24
+        // XAD = 1.27 - 1.618
+
+        is_butterfly = f_within_tolerance(xab, FIB_0786, fib_tolerance) and
+                       (abc >= FIB_0382 - fib_tolerance and abc <= FIB_0886 + fib_tolerance) and
+                       (bcd >= FIB_1618 - fib_tolerance and bcd <= FIB_2240 + fib_tolerance) and
+                       (xad >= FIB_1272 - fib_tolerance and xad <= FIB_1618 + fib_tolerance)
+
+        is_potential = (not is_butterfly) and show_potential and
+                       f_within_tolerance(xab, FIB_0786, fib_tolerance * 1.5)
+
+        if is_butterfly or is_potential
+            line_style = is_butterfly ? line.style_solid : line.style_dashed
+            pattern_label = is_butterfly ? "Butterfly" : "Potential Butterfly"
+
+            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
+
+            is_bullish = a > x
+
+            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
+
+// Detect Bat Pattern
+f_detect_bat() =>
+    if array.size(zz_price) >= 5 and show_harmonic
+        size = array.size(zz_price)
+
+        x = array.get(zz_price, size - 5)
+        a = array.get(zz_price, size - 4)
+        b = array.get(zz_price, size - 3)
+        c = array.get(zz_price, size - 2)
+        d = array.get(zz_price, size - 1)
+
+        bx = array.get(zz_bar, size - 5)
+        ba = array.get(zz_bar, size - 4)
+        bb = array.get(zz_bar, size - 3)
+        bc = array.get(zz_bar, size - 2)
+        bd = array.get(zz_bar, size - 1)
+
+        xab = f_retracement(x, a, b)
+        abc = f_retracement(a, b, c)
+        bcd = f_retracement(b, c, d)
+        xad = f_retracement(x, a, d)
+
+        // Bat ratios:
+        // XAB = 0.382 - 0.50
+        // ABC = 0.382 - 0.886
+        // BCD = 1.618 - 2.618
+        // XAD = 0.886
+
+        is_bat = (xab >= FIB_0382 - fib_tolerance and xab <= FIB_0500 + fib_tolerance) and
+                 (abc >= FIB_0382 - fib_tolerance and abc <= FIB_0886 + fib_tolerance) and
+                 (bcd >= FIB_1618 - fib_tolerance and bcd <= FIB_2618 + fib_tolerance) and
+                 f_within_tolerance(xad, FIB_0886, fib_tolerance)
+
+        is_potential = (not is_bat) and show_potential and
+                       (xab >= FIB_0382 - fib_tolerance * 1.5 and xab <= FIB_0500 + fib_tolerance * 1.5)
+
+        if is_bat or is_potential
+            line_style = is_bat ? line.style_solid : line.style_dashed
+            pattern_label = is_bat ? "Bat" : "Potential Bat"
+
+            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
+
+            is_bullish = a > x
+
+            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
+
+// Detect Crab Pattern
+f_detect_crab() =>
+    if array.size(zz_price) >= 5 and show_harmonic
+        size = array.size(zz_price)
+
+        x = array.get(zz_price, size - 5)
+        a = array.get(zz_price, size - 4)
+        b = array.get(zz_price, size - 3)
+        c = array.get(zz_price, size - 2)
+        d = array.get(zz_price, size - 1)
+
+        bx = array.get(zz_bar, size - 5)
+        ba = array.get(zz_bar, size - 4)
+        bb = array.get(zz_bar, size - 3)
+        bc = array.get(zz_bar, size - 2)
+        bd = array.get(zz_bar, size - 1)
+
+        xab = f_retracement(x, a, b)
+        abc = f_retracement(a, b, c)
+        bcd = f_extension(b, c, d)
+        xad = f_extension(x, a, d)
+
+        // Crab ratios:
+        // XAB = 0.382 - 0.618
+        // ABC = 0.382 - 0.886
+        // BCD = 2.24 - 3.618
+        // XAD = 1.618
+
+        is_crab = (xab >= FIB_0382 - fib_tolerance and xab <= FIB_0618 + fib_tolerance) and
+                  (abc >= FIB_0382 - fib_tolerance and abc <= FIB_0886 + fib_tolerance) and
+                  (bcd >= FIB_2240 - fib_tolerance) and
+                  f_within_tolerance(xad, FIB_1618, fib_tolerance)
+
+        if is_crab
+            line.new(bx, x, ba, a, color=color_harmonic, width=2)
+            line.new(ba, a, bb, b, color=color_harmonic, width=2)
+            line.new(bb, b, bc, c, color=color_harmonic, width=2)
+            line.new(bc, c, bd, d, color=color_harmonic, width=2)
+
+            is_bullish = a > x
+
+            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), "Crab", style=label.style_none, textcolor=color_harmonic, size=size.normal)
+
+// Detect Shark Pattern
+f_detect_shark() =>
+    if array.size(zz_price) >= 5 and show_harmonic
+        size = array.size(zz_price)
+
+        x = array.get(zz_price, size - 5)
+        a = array.get(zz_price, size - 4)
+        b = array.get(zz_price, size - 3)
+        c = array.get(zz_price, size - 2)
+        d = array.get(zz_price, size - 1)
+
+        bx = array.get(zz_bar, size - 5)
+        ba = array.get(zz_bar, size - 4)
+        bb = array.get(zz_bar, size - 3)
+        bc = array.get(zz_bar, size - 2)
+        bd = array.get(zz_bar, size - 1)
+
+        xab = f_retracement(x, a, b)
+        abc = f_retracement(a, b, c)
+        xad = f_extension(x, a, d)
+
+        // Shark ratios:
+        // XAB = 0.382 - 0.618
+        // ABC = 1.13 - 1.618
+        // XAD = 0.886 - 1.13
+
+        is_shark = (xab >= FIB_0382 - fib_tolerance and xab <= FIB_0618 + fib_tolerance) and
+                   (abc >= FIB_1130 - fib_tolerance and abc <= FIB_1618 + fib_tolerance) and
+                   (xad >= FIB_0886 - fib_tolerance and xad <= FIB_1130 + fib_tolerance)
+
+        if is_shark
+            line.new(bx, x, ba, a, color=color_harmonic, width=2)
+            line.new(ba, a, bb, b, color=color_harmonic, width=2)
+            line.new(bb, b, bc, c, color=color_harmonic, width=2)
+            line.new(bc, c, bd, d, color=color_harmonic, width=2)
+
+            is_bullish = a > x
+
+            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), "Shark", style=label.style_none, textcolor=color_harmonic, size=size.normal)
+
+// Detect Cypher Pattern
+f_detect_cypher() =>
+    if array.size(zz_price) >= 5 and show_harmonic
+        size = array.size(zz_price)
+
+        x = array.get(zz_price, size - 5)
+        a = array.get(zz_price, size - 4)
+        b = array.get(zz_price, size - 3)
+        c = array.get(zz_price, size - 2)
+        d = array.get(zz_price, size - 1)
+
+        bx = array.get(zz_bar, size - 5)
+        ba = array.get(zz_bar, size - 4)
+        bb = array.get(zz_bar, size - 3)
+        bc = array.get(zz_bar, size - 2)
+        bd = array.get(zz_bar, size - 1)
+
+        xab = f_retracement(x, a, b)
+        axc = f_extension(a, x, c)
+        xcd = f_retracement(x, c, d)
+
+        // Cypher ratios:
+        // XAB = 0.382 - 0.618
+        // AXC = 1.13 - 1.414
+        // XCD = 0.786
+
+        is_cypher = (xab >= FIB_0382 - fib_tolerance and xab <= FIB_0618 + fib_tolerance) and
+                    (axc >= FIB_1130 - fib_tolerance and axc <= FIB_1414 + fib_tolerance) and
+                    f_within_tolerance(xcd, FIB_0786, fib_tolerance)
+
+        if is_cypher
+            line.new(bx, x, ba, a, color=color_harmonic, width=2)
+            line.new(ba, a, bb, b, color=color_harmonic, width=2)
+            line.new(bb, b, bc, c, color=color_harmonic, width=2)
+            line.new(bc, c, bd, d, color=color_harmonic, width=2)
+
+            is_bullish = a > x
+
+            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), "Cypher", style=label.style_none, textcolor=color_harmonic, size=size.normal)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VII. WYCKOFF PATTERN DETECTION (와이코프 패턴 탐지)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Detect Wyckoff Accumulation Phases
+f_detect_wyckoff() =>
+    if array.size(zz_price) >= 5 and show_wyckoff
+        size = array.size(zz_price)
+
+        // Simplified Wyckoff detection based on price and volume patterns
+        // Look for: PS (Preliminary Support), AR (Automatic Rally), ST (Secondary Test), Spring
+
+        p0 = array.get(zz_price, size - 5)
+        p1 = array.get(zz_price, size - 4)
+        p2 = array.get(zz_price, size - 3)
+        p3 = array.get(zz_price, size - 2)
+        p4 = array.get(zz_price, size - 1)
+
+        b0 = array.get(zz_bar, size - 5)
+        b1 = array.get(zz_bar, size - 4)
+        b2 = array.get(zz_bar, size - 3)
+        b3 = array.get(zz_bar, size - 2)
+        b4 = array.get(zz_bar, size - 1)
+
+        d0 = array.get(zz_direction, size - 5)
+
+        // Look for accumulation pattern (series of lows with rallies)
+        if d0 == -1 and p1 > p0 and p2 < p1 and p3 > p2
+            // PS - Initial selling pressure stops
+            label.new(b0, p0, "PS", style=label.style_label_down, color=color_wyckoff, textcolor=color.white, size=size.tiny, tooltip="Preliminary Support")
+
+            // AR - Automatic rally
+            label.new(b1, p1, "AR", style=label.style_label_up, color=color_wyckoff, textcolor=color.white, size=size.tiny, tooltip="Automatic Rally")
+
+            // ST - Secondary test
+            label.new(b2, p2, "ST", style=label.style_label_down, color=color_wyckoff, textcolor=color.white, size=size.tiny, tooltip="Secondary Test")
+
+            // Check for spring (break below support then rally)
+            if p4 < p2
+                label.new(b4, p4, "Spring", style=label.style_label_down, color=color_wyckoff, textcolor=color.white, size=size.tiny, tooltip="Spring")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VIII. DOW THEORY DETECTION (다우 이론 탐지)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Detect Dow Theory Trends
+f_detect_dow_theory() =>
+    if show_dow
+        // Calculate trend using simple moving averages
+        sma_short = ta.sma(close, 20)
+        sma_medium = ta.sma(close, 50)
+        sma_long = ta.sma(close, 200)
+
+        // Short-term trend
+        short_trend = close > sma_short ? "Bullish" : "Bearish"
+        short_color = close > sma_short ? color.new(color_dow, 70) : color.new(color.red, 70)
+
+        // Intermediate trend
+        inter_trend = sma_short > sma_medium ? "Bullish" : "Bearish"
+        inter_color = sma_short > sma_medium ? color.new(color_dow, 50) : color.new(color.red, 50)
+
+        // Long-term trend
+        long_trend = sma_medium > sma_long ? "Bullish" : "Bearish"
+        long_color = sma_medium > sma_long ? color.new(color_dow, 30) : color.new(color.red, 30)
+
+        // Display trend information at the right edge of chart
+        if barstate.islast
+            var table dow_table = table.new(position.top_right, 2, 4, border_width=1)
+            table.cell(dow_table, 0, 0, "Dow Theory", bgcolor=color.new(color_dow, 80), text_color=color.white, text_size=size.small)
+            table.cell(dow_table, 1, 0, "", bgcolor=color.new(color_dow, 80))
+
+            table.cell(dow_table, 0, 1, "Short-Term", text_color=color.white, text_size=size.tiny)
+            table.cell(dow_table, 1, 1, short_trend, bgcolor=short_color, text_color=color.white, text_size=size.tiny)
+
+            table.cell(dow_table, 0, 2, "Intermediate", text_color=color.white, text_size=size.tiny)
+            table.cell(dow_table, 1, 2, inter_trend, bgcolor=inter_color, text_color=color.white, text_size=size.tiny)
+
+            table.cell(dow_table, 0, 3, "Long-Term", text_color=color.white, text_size=size.tiny)
+            table.cell(dow_table, 1, 3, long_trend, bgcolor=long_color, text_color=color.white, text_size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IX. MASTER PATTERN DETECTION (마스터 패턴 탐지)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Detect Master Pattern (Contraction, Expansion, Trend)
+f_detect_master_pattern() =>
+    if show_master
+        // Calculate volatility using ATR
+        atr14 = ta.atr(14)
+        atr_sma = ta.sma(atr14, 20)
+
+        // Bollinger Bands for contraction detection
+        bb_basis = ta.sma(close, 20)
+        bb_dev = ta.stdev(close, 20)
+        bb_upper = bb_basis + 2 * bb_dev
+        bb_lower = bb_basis - 2 * bb_dev
+        bb_width = (bb_upper - bb_lower) / bb_basis
+
+        // Contraction: Low volatility (narrow Bollinger Bands)
+        is_contraction = bb_width < ta.sma(bb_width, 50) * 0.7
+
+        // Expansion: High volatility (wide Bollinger Bands or strong price move)
+        is_expansion = bb_width > ta.sma(bb_width, 50) * 1.3 or atr14 > atr_sma * 1.5
+
+        // Trend: Strong directional movement
+        ema_fast = ta.ema(close, 9)
+        ema_slow = ta.ema(close, 21)
+        is_uptrend = ema_fast > ema_slow and close > ema_fast
+        is_downtrend = ema_fast < ema_slow and close < ema_fast
+
+        // Visual representation
+        var int contraction_start = na
+        var int expansion_start = na
+
+        // Contraction zone (yellow box)
+        if is_contraction and na(contraction_start)
+            contraction_start := bar_index
+        else if not is_contraction and not na(contraction_start)
+            box.new(contraction_start, high[1], bar_index, low[1], border_color=color.new(color.yellow, 50), bgcolor=color_master_contraction, text="Contraction", text_color=color.new(color.yellow, 0), text_size=size.small)
+            contraction_start := na
+
+        // Expansion line (purple line)
+        if is_expansion
+            line.new(bar_index - 1, close[1], bar_index, close, color=color_master_expansion, width=3)
+
+        // Trend arrow
+        if is_uptrend
+            label.new(bar_index, low, "▲ Trend", style=label.style_label_up, color=color_master_trend, textcolor=color.white, size=size.tiny)
+        else if is_downtrend
+            label.new(bar_index, high, "▼ Trend", style=label.style_label_down, color=color_master_trend, textcolor=color.white, size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// X. MAIN EXECUTION (메인 실행)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Execute pattern detection functions
+if barstate.islast or barstate.isrealtime
+    // Elliott Wave patterns
+    f_detect_impulse_wave()
+    f_detect_corrective_wave()
+    f_detect_connecting_wave_wxy()
+    f_detect_triangle_wave()
+
+    // Harmonic patterns
+    f_detect_gartley()
+    f_detect_butterfly()
+    f_detect_bat()
+    f_detect_crab()
+    f_detect_shark()
+    f_detect_cypher()
+
+    // Wyckoff
+    f_detect_wyckoff()
+
+// Dow Theory (runs on every bar for table update)
+f_detect_dow_theory()
+
+// Master Pattern (runs on every bar for real-time detection)
+f_detect_master_pattern()
+
+// Debug output
+if debug_mode and barstate.islast
+    var label debug_label = label.new(bar_index, high, "", style=label.style_label_down, color=color.new(color.gray, 80), textcolor=color.white, size=size.small)
+    label.set_xy(debug_label, bar_index, high)
+    label.set_text(debug_label, "Debug: ZigZag Points=" + str.tostring(array.size(zz_price)))
+
+// Plot ZigZag line for reference (optional)
+if array.size(zz_price) >= 2
+    last_price = array.get(zz_price, array.size(zz_price) - 1)
+    last_bar = array.get(zz_bar, array.size(zz_bar) - 1)
+    if bar_index >= last_bar
+        line.new(last_bar, last_price, bar_index, close, color=color.new(color.gray, 70), width=1, style=line.style_dotted)
+
+plot(na, title="Advanced Market Analysis")
