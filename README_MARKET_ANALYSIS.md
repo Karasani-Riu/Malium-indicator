@@ -94,6 +94,94 @@ Identifies three key market phases:
 - **Visualization**: Directional arrows (▲ uptrend, ▼ downtrend)
 - **Meaning**: Sustained directional price movement
 
+### 6. Kondratiev Wave (콘드라티예프 파동)
+
+Long-term economic cycle analysis adapted for trading timeframes (originally 40-60 year cycles):
+
+#### Four Seasonal Phases
+- **Spring (Recovery)**: Rising from bottom, early recovery phase
+  - Cycle Position: 0-25%
+  - Price Action: Rising with positive momentum
+  - Color: Green
+
+- **Summer (Prosperity)**: Peak expansion, maximum growth
+  - Cycle Position: 25-60%
+  - Price Action: Strong uptrend continuation
+  - Color: Yellow
+
+- **Autumn (Recession)**: Declining from peak, distribution phase
+  - Cycle Position: 60-100%
+  - Price Action: Weakening with negative momentum
+  - Color: Orange
+
+- **Winter (Depression)**: Bottom formation, accumulation phase
+  - Cycle Position: 0-25%
+  - Price Action: Declining with negative momentum
+  - Color: Blue
+
+#### Visualization
+- **Real-time Table**: Bottom-right corner showing current phase and cycle position
+- **Phase Transition Markers**: Labels appear when phases change
+- **Cycle Position %**: Shows where price is within the long-term cycle
+
+### 7. Deep Depth Cycle (심층 사이클)
+
+Multi-timeframe cycle analysis using Hurst-inspired detrended oscillators:
+
+#### Three Cycle Tiers
+- **Short Cycle (SC)**: Default 20 periods
+  - Detects minor market rhythms
+  - Labels: SC↑ (peak) and SC↓ (trough)
+
+- **Medium Cycle (MC)**: Default 50 periods
+  - Identifies intermediate swings
+  - Labels: MC↑ (peak) and MC↓ (trough)
+
+- **Long Cycle (LC)**: Default 100 periods
+  - Reveals major market cycles
+  - Labels: LC↑ (peak) and LC↓ (trough)
+  - **Important**: Long cycle extremes signal major reversals
+
+#### Features
+- **Cycle Alignment Detection**: Background color when all 3 cycles align
+  - Green background: All cycles bullish (strong upward momentum)
+  - Red background: All cycles bearish (strong downward momentum)
+- **Real-time Status Table**: Middle-right showing all cycle directions
+- **Detrended Analysis**: Removes trend to isolate pure cyclical movement
+- **Normalized Oscillators**: Standard deviation-based thresholds for reliable signals
+
+### 8. Jesse Livermore Accumulation Cylinder (제시 리버모어 축적 실린더)
+
+Horizontal consolidation pattern detection based on Jesse Livermore's trading methodology:
+
+#### Cylinder Formation
+- **Consolidation Detection**: Price trades in narrow range (default ≤3% range)
+- **Minimum Duration**: Default 10 bars minimum for valid cylinder
+- **Volume Confirmation**: Consistent volume during accumulation
+- **Visual Box**: Olive-colored rectangle marking the cylinder zone
+
+#### Breakout Signals
+- **Bullish Breakout**: Price closes above cylinder top
+  - Label: "Cylinder Breakout ▲"
+  - Green arrow projection showing expected move
+  - Expected move: Height of cylinder projected upward
+
+- **Bearish Breakout**: Price closes below cylinder bottom
+  - Label: "Cylinder Breakout ▼"
+  - Red arrow projection showing expected move
+  - Expected move: Height of cylinder projected downward
+
+#### States
+- **Forming Cylinder**: Dashed border box (in progress)
+- **Completed Cylinder**: Solid border box with bar count
+- **Breakout**: Strong directional signal with projected target
+
+#### Trading Application
+- Wait for cylinder formation (accumulation/distribution)
+- Enter on breakout in direction of break
+- Target: Minimum = cylinder height
+- Stop loss: Opposite side of cylinder
+
 ## ⚙️ Configuration Options
 
 ### Pattern Display Toggles
@@ -111,6 +199,9 @@ Show Harmonic Patterns                // Toggle all harmonic patterns
 Show Wyckoff Phases                   // Toggle Wyckoff phase labels
 Show Dow Theory                       // Toggle Dow Theory table
 Show Master Pattern                   // Toggle Master Pattern visualization
+Show Kondratiev Wave                  // Toggle Kondratiev Wave cycle analysis
+Show Deep Depth Cycle                 // Toggle multi-timeframe cycle detection
+Show Livermore Accumulation Cylinder  // Toggle Jesse Livermore cylinder pattern
 ```
 
 ### ZigZag Settings
@@ -123,6 +214,25 @@ Show Master Pattern                   // Toggle Master Pattern visualization
 - **Fibonacci Tolerance**: Ratio matching tolerance (default: 0.15, range: 0.05-0.30)
 - **Show Potential Patterns**: Display forming patterns with dashed lines
 
+### Kondratiev Wave Settings
+
+- **Lookback Period**: Historical bars to analyze for cycle detection (default: 250, range: 50-1000)
+  - Higher values: Longer-term cycle analysis (recommended for daily/weekly charts)
+  - Lower values: Shorter-term cycle analysis (for intraday charts)
+
+### Deep Depth Cycle Settings
+
+- **Short Cycle Length**: Period for short-term cycle (default: 20, range: 5-100)
+- **Medium Cycle Length**: Period for medium-term cycle (default: 50, range: 20-200)
+- **Long Cycle Length**: Period for long-term cycle (default: 100, range: 50-500)
+
+### Livermore Cylinder Settings
+
+- **Minimum Consolidation Bars**: Minimum bars for valid cylinder (default: 10, range: 5-50)
+- **Max Range %**: Maximum price range % for cylinder formation (default: 3.0%, range: 1.0-10.0%)
+  - Lower values: Tighter consolidation required (more selective)
+  - Higher values: Allows wider consolidation (more patterns detected)
+
 ### Color Customization
 
 - **Impulse Wave Color**: Default blue
@@ -134,6 +244,9 @@ Show Master Pattern                   // Toggle Master Pattern visualization
   - Contraction: Yellow (80% transparency)
   - Expansion: Purple
   - Trend: Teal
+- **Kondratiev Wave Color**: Default navy
+- **Deep Depth Cycle Color**: Default maroon
+- **Livermore Cylinder Color**: Default olive (70% transparency)
 
 ### Advanced Settings
 
