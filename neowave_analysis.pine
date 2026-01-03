@@ -1,0 +1,414 @@
+//@version=5
+indicator("NEoWave Analysis - Glenn Neely Method", shorttitle="NEoWave", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// I. USER INPUTS & CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var group_neowave = "NEoWave Settings"
+show_monowaves = input.bool(true, title="Show Monowaves", group=group_neowave)
+show_structure = input.bool(true, title="Show Structure Labels (:3/:5)", group=group_neowave)
+show_terminal = input.bool(true, title="Show Terminal Patterns", group=group_neowave)
+show_channels = input.bool(true, title="Show Wave Channels", group=group_neowave)
+show_fibonacci = input.bool(true, title="Show Fibonacci Relationships", group=group_neowave)
+
+var group_detection = "Detection Parameters"
+min_monowave_bars = input.int(3, title="Minimum Monowave Bars", minval=1, maxval=20, group=group_detection)
+price_change_threshold = input.float(0.5, title="Price Change Threshold %", minval=0.1, maxval=5.0, step=0.1, group=group_detection)
+overlap_tolerance = input.float(0.02, title="Overlap Tolerance %", minval=0.0, maxval=0.1, step=0.01, group=group_detection)
+
+var group_colors = "Color Settings"
+color_impulse_wave = input.color(color.new(color.blue, 0), title="Impulse Wave Color", group=group_colors)
+color_corrective_wave = input.color(color.new(color.red, 0), title="Corrective Wave Color", group=group_colors)
+color_terminal = input.color(color.new(color.orange, 0), title="Terminal Pattern Color", group=group_colors)
+color_monowave = input.color(color.new(color.gray, 30), title="Monowave Color", group=group_colors)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// II. MONOWAVE DETECTION (방향 전환 감지)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Glenn Neely Definition: "Movement from one price direction change to the next"
+// Rule of Neutrality: Temporary slowdowns don't create new monowaves
+
+var float[] monowave_prices = array.new_float(0)
+var int[] monowave_bars = array.new_int(0)
+var int[] monowave_direction = array.new_int(0) // 1 = up, -1 = down
+var string[] monowave_labels = array.new_string(0)
+
+// Detect significant direction changes
+var float last_extreme = na
+var int last_extreme_bar = na
+var int current_direction = na
+var int bars_since_extreme = 0
+
+// Price change detection
+price_change_pct = price_change_threshold / 100.0
+
+if na(last_extreme)
+    last_extreme := close
+    last_extreme_bar := bar_index
+    current_direction := 0
+
+// Check for upward movement
+if close > last_extreme * (1 + price_change_pct)
+    if current_direction != 1 and bars_since_extreme >= min_monowave_bars
+        // Direction change to up - record previous extreme
+        array.push(monowave_prices, last_extreme)
+        array.push(monowave_bars, last_extreme_bar)
+        array.push(monowave_direction, -1) // Previous was down
+        if array.size(monowave_prices) > 50
+            array.shift(monowave_prices)
+            array.shift(monowave_bars)
+            array.shift(monowave_direction)
+        current_direction := 1
+        bars_since_extreme := 0
+    last_extreme := close
+    last_extreme_bar := bar_index
+
+// Check for downward movement
+else if close < last_extreme * (1 - price_change_pct)
+    if current_direction != -1 and bars_since_extreme >= min_monowave_bars
+        // Direction change to down - record previous extreme
+        array.push(monowave_prices, last_extreme)
+        array.push(monowave_bars, last_extreme_bar)
+        array.push(monowave_direction, 1) // Previous was up
+        if array.size(monowave_prices) > 50
+            array.shift(monowave_prices)
+            array.shift(monowave_bars)
+            array.shift(monowave_direction)
+        current_direction := -1
+        bars_since_extreme := 0
+    last_extreme := close
+    last_extreme_bar := bar_index
+
+// Update extreme if continuing in same direction
+else if current_direction == 1 and high > last_extreme
+    last_extreme := high
+    last_extreme_bar := bar_index
+else if current_direction == -1 and low < last_extreme
+    last_extreme := low
+    last_extreme_bar := bar_index
+
+bars_since_extreme += 1
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// III. WAVE STRUCTURE CLASSIFICATION (:3 vs :5)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Classify segments as Impulsive (:5) or Corrective (:3)
+f_classify_structure(wave_count) =>
+    // NEoWave rules:
+    // :5 = Impulsive (trending or terminal)
+    // :3 = Corrective (zigzag, flat, triangle)
+    wave_count == 5 ? ":5" : wave_count == 3 ? ":3" : ""
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IV. RETRACEMENT VALIDATION RULES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Calculate retracement percentage
+f_retracement(start, end, retrace) =>
+    range = math.abs(end - start)
+    retrace_amount = math.abs(retrace - end)
+    range > 0 ? (retrace_amount / range) : 0.0
+
+// Validate Wave 2: Cannot retrace more than 100% of Wave 1
+f_validate_wave2(wave1_start, wave1_end, wave2_end) =>
+    is_uptrend = wave1_end > wave1_start
+    if is_uptrend
+        wave2_end > wave1_start // Wave 2 low must be above Wave 1 start
+    else
+        wave2_end < wave1_start // Wave 2 high must be below Wave 1 start
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// V. OVERLAP RULE (Wave 4 cannot overlap Wave 1)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_check_overlap(wave1_start, wave1_end, wave4_start, wave4_end) =>
+    tolerance = overlap_tolerance / 100.0
+
+    is_uptrend = wave1_end > wave1_start
+
+    if is_uptrend
+        // In uptrend, Wave 4 low should not go below Wave 1 high (with tolerance)
+        wave4_low = math.min(wave4_start, wave4_end)
+        wave1_high = wave1_end
+        no_overlap = wave4_low >= wave1_high * (1 - tolerance)
+        no_overlap
+    else
+        // In downtrend, Wave 4 high should not go above Wave 1 low (with tolerance)
+        wave4_high = math.max(wave4_start, wave4_end)
+        wave1_low = wave1_end
+        no_overlap = wave4_high <= wave1_low * (1 + tolerance)
+        no_overlap
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VI. ALTERNATION RULE (Waves 2 & 4 should differ)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_check_alternation(wave2_size, wave4_size, wave2_time, wave4_time) =>
+    // Waves should differ in price magnitude or time duration
+    size_ratio = wave2_size / wave4_size
+    time_ratio = wave2_time / wave4_time
+
+    // Alternation exists if size OR time differs significantly
+    size_differs = size_ratio < 0.7 or size_ratio > 1.3
+    time_differs = time_ratio < 0.7 or time_ratio > 1.3
+
+    size_differs or time_differs
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VII. EXTENSION RULE (Identify extending wave)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_identify_extension(wave1_size, wave3_size, wave5_size) =>
+    // One wave should be significantly longer (1.618x or more)
+    max_wave = math.max(wave1_size, math.max(wave3_size, wave5_size))
+
+    extending_wave = 0
+    if wave1_size == max_wave and wave1_size >= wave3_size * 1.618
+        extending_wave := 1
+    else if wave3_size == max_wave and wave3_size >= wave1_size * 1.618
+        extending_wave := 3
+    else if wave5_size == max_wave and wave5_size >= wave3_size * 1.618
+        extending_wave := 5
+
+    extending_wave
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VIII. FIBONACCI RELATIONSHIPS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var float FIB_236 = 0.236
+var float FIB_382 = 0.382
+var float FIB_500 = 0.500
+var float FIB_618 = 0.618
+var float FIB_786 = 0.786
+var float FIB_1000 = 1.000
+var float FIB_1272 = 1.272
+var float FIB_1618 = 1.618
+var float FIB_2618 = 2.618
+
+f_check_fibonacci_relationship(value, target_fib, tolerance=0.1) =>
+    math.abs(value - target_fib) <= tolerance
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IX. IMPULSE WAVE DETECTION (5-WAVE STRUCTURE)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_detect_impulse_pattern() =>
+    if array.size(monowave_prices) >= 6 and show_structure
+        size = array.size(monowave_prices)
+
+        // Get last 6 extremes for 5-wave pattern (0-1-2-3-4-5)
+        p0 = array.get(monowave_prices, size - 6)
+        p1 = array.get(monowave_prices, size - 5)
+        p2 = array.get(monowave_prices, size - 4)
+        p3 = array.get(monowave_prices, size - 3)
+        p4 = array.get(monowave_prices, size - 2)
+        p5 = array.get(monowave_prices, size - 1)
+
+        b0 = array.get(monowave_bars, size - 6)
+        b1 = array.get(monowave_bars, size - 5)
+        b2 = array.get(monowave_bars, size - 4)
+        b3 = array.get(monowave_bars, size - 3)
+        b4 = array.get(monowave_bars, size - 2)
+        b5 = array.get(monowave_bars, size - 1)
+
+        // Calculate wave sizes
+        wave1 = math.abs(p1 - p0)
+        wave2 = math.abs(p2 - p1)
+        wave3 = math.abs(p3 - p2)
+        wave4 = math.abs(p4 - p3)
+        wave5 = math.abs(p5 - p4)
+
+        // Calculate time durations
+        time2 = b2 - b1
+        time4 = b4 - b3
+
+        is_uptrend = p1 > p0
+
+        // Validate impulse rules
+        valid_wave2 = f_validate_wave2(p0, p1, p2)
+        no_overlap = f_check_overlap(p0, p1, p3, p4)
+        has_alternation = f_check_alternation(wave2, wave4, time2, time4)
+        wave3_not_shortest = wave3 > wave1 or wave3 > wave5
+
+        // Check for extension
+        extending_wave = f_identify_extension(wave1, wave3, wave5)
+
+        if valid_wave2 and no_overlap and has_alternation and wave3_not_shortest
+            // Draw impulse wave structure
+            line.new(b0, p0, b1, p1, color=color_impulse_wave, width=2)
+            line.new(b1, p1, b2, p2, color=color_impulse_wave, width=2)
+            line.new(b2, p2, b3, p3, color=color_impulse_wave, width=2)
+            line.new(b3, p3, b4, p4, color=color_impulse_wave, width=2)
+            line.new(b4, p4, b5, p5, color=color_impulse_wave, width=2)
+
+            // Label waves
+            label.new(b1, p1, "①" + (extending_wave == 1 ? "\nExt" : ""),
+                     style=is_uptrend ? label.style_label_up : label.style_label_down,
+                     color=color_impulse_wave, textcolor=color.white, size=size.normal)
+            label.new(b2, p2, "②",
+                     style=is_uptrend ? label.style_label_down : label.style_label_up,
+                     color=color_impulse_wave, textcolor=color.white, size=size.normal)
+            label.new(b3, p3, "③" + (extending_wave == 3 ? "\nExt" : ""),
+                     style=is_uptrend ? label.style_label_up : label.style_label_down,
+                     color=color_impulse_wave, textcolor=color.white, size=size.normal)
+            label.new(b4, p4, "④",
+                     style=is_uptrend ? label.style_label_down : label.style_label_up,
+                     color=color_impulse_wave, textcolor=color.white, size=size.normal)
+            label.new(b5, p5, "⑤" + (extending_wave == 5 ? "\nExt" : ""),
+                     style=is_uptrend ? label.style_label_up : label.style_label_down,
+                     color=color_impulse_wave, textcolor=color.white, size=size.normal)
+
+            // Add structure label
+            label.new(b3, p3 + (is_uptrend ? wave3 * 0.1 : -wave3 * 0.1), ":5 Impulse",
+                     style=label.style_none, textcolor=color_impulse_wave, size=size.small)
+
+            // Draw channel if enabled
+            if show_channels
+                // Channel line through waves 1-3
+                line.new(b0, p0, b5, p0 + (p3 - p0) * 1.0, color=color.new(color_impulse_wave, 70), width=1, style=line.style_dashed)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// X. CORRECTIVE WAVE DETECTION (3-WAVE STRUCTURE)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_detect_corrective_pattern() =>
+    if array.size(monowave_prices) >= 4 and show_structure
+        size = array.size(monowave_prices)
+
+        // Get last 4 extremes for 3-wave pattern (A-B-C)
+        p0 = array.get(monowave_prices, size - 4)
+        p1 = array.get(monowave_prices, size - 3)
+        p2 = array.get(monowave_prices, size - 2)
+        p3 = array.get(monowave_prices, size - 1)
+
+        b0 = array.get(monowave_bars, size - 4)
+        b1 = array.get(monowave_bars, size - 3)
+        b2 = array.get(monowave_bars, size - 2)
+        b3 = array.get(monowave_bars, size - 1)
+
+        waveA = math.abs(p1 - p0)
+        waveB = math.abs(p2 - p1)
+        waveC = math.abs(p3 - p2)
+
+        is_upward_correction = p1 < p0 // Correcting a downtrend
+
+        // Validate correction structure
+        if waveA > 0 and waveB > 0 and waveC > 0
+            // Draw corrective structure
+            line.new(b0, p0, b1, p1, color=color_corrective_wave, width=2)
+            line.new(b1, p1, b2, p2, color=color_corrective_wave, width=2)
+            line.new(b2, p2, b3, p3, color=color_corrective_wave, width=2)
+
+            // Label waves
+            label.new(b1, p1, "A",
+                     style=is_upward_correction ? label.style_label_up : label.style_label_down,
+                     color=color_corrective_wave, textcolor=color.white, size=size.normal)
+            label.new(b2, p2, "B",
+                     style=is_upward_correction ? label.style_label_down : label.style_label_up,
+                     color=color_corrective_wave, textcolor=color.white, size=size.normal)
+            label.new(b3, p3, "C",
+                     style=is_upward_correction ? label.style_label_up : label.style_label_down,
+                     color=color_corrective_wave, textcolor=color.white, size=size.normal)
+
+            // Add structure label
+            label.new(b2, p2, ":3 Corrective",
+                     style=label.style_none, textcolor=color_corrective_wave, size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// XI. TERMINAL PATTERN DETECTION (Diagonal)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_detect_terminal_pattern() =>
+    if array.size(monowave_prices) >= 6 and show_terminal
+        size = array.size(monowave_prices)
+
+        p0 = array.get(monowave_prices, size - 6)
+        p1 = array.get(monowave_prices, size - 5)
+        p2 = array.get(monowave_prices, size - 4)
+        p3 = array.get(monowave_prices, size - 3)
+        p4 = array.get(monowave_prices, size - 2)
+        p5 = array.get(monowave_prices, size - 1)
+
+        b0 = array.get(monowave_bars, size - 6)
+        b3 = array.get(monowave_bars, size - 3)
+        b5 = array.get(monowave_bars, size - 1)
+
+        wave1 = math.abs(p1 - p0)
+        wave3 = math.abs(p3 - p2)
+        wave5 = math.abs(p5 - p4)
+
+        is_uptrend = p1 > p0
+
+        // Terminal: Wave 4 overlaps Wave 1 (opposite of normal impulse)
+        has_overlap = not f_check_overlap(p0, p1, p3, p4)
+
+        // Waves converge (each wave smaller than previous)
+        is_converging = wave5 < wave3 and wave3 < wave1
+
+        if has_overlap and is_converging
+            // Terminal pattern detected - NEoWave: "Indicates crash within 3 months or less"
+            label.new(b3, p3, "TERMINAL\n:5 Diagonal",
+                     style=label.style_label_down,
+                     color=color_terminal,
+                     textcolor=color.white,
+                     size=size.large,
+                     tooltip="NEoWave Terminal: Major reversal imminent (within 3 months)")
+
+            // Draw converging lines
+            line.new(b0, p0, b5, p5, color=color_terminal, width=3, style=line.style_dashed)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// XII. POSITION INDICATORS & WAVE DEGREE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+f_display_position_indicator() =>
+    if barstate.islast and array.size(monowave_prices) > 0
+        size = array.size(monowave_prices)
+
+        // Determine current position in wave structure
+        position_text = "Early Stage"
+        if size >= 3
+            position_text := "Middle Stage"
+        if size >= 5
+            position_text := "Late Stage - Completion Near"
+
+        // Display position indicator
+        var table pos_table = table.new(position.top_left, 2, 3, border_width=1)
+        table.cell(pos_table, 0, 0, "NEoWave Position", bgcolor=color.new(color_impulse_wave, 60), text_color=color.white, text_size=size.small)
+        table.cell(pos_table, 1, 0, "", bgcolor=color.new(color_impulse_wave, 60))
+
+        table.cell(pos_table, 0, 1, "Current Stage", text_color=color.white, text_size=size.tiny)
+        table.cell(pos_table, 1, 1, position_text, bgcolor=color.new(color_impulse_wave, 80), text_color=color.white, text_size=size.tiny)
+
+        table.cell(pos_table, 0, 2, "Monowaves Count", text_color=color.white, text_size=size.tiny)
+        table.cell(pos_table, 1, 2, str.tostring(size), bgcolor=color.new(color_impulse_wave, 80), text_color=color.white, text_size=size.tiny)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// XIII. MAIN EXECUTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Draw monowaves
+if show_monowaves and array.size(monowave_prices) >= 2
+    size = array.size(monowave_prices)
+    for i = 0 to size - 2
+        p1 = array.get(monowave_prices, i)
+        p2 = array.get(monowave_prices, i + 1)
+        b1 = array.get(monowave_bars, i)
+        b2 = array.get(monowave_bars, i + 1)
+
+        line.new(b1, p1, b2, p2, color=color_monowave, width=1, style=line.style_solid)
+
+// Execute pattern detection
+if barstate.islast or barstate.isrealtime
+    f_detect_impulse_pattern()
+    f_detect_corrective_pattern()
+    f_detect_terminal_pattern()
+
+// Display position indicator
+f_display_position_indicator()
+
+plot(na, title="NEoWave Analysis")
