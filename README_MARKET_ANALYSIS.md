@@ -2,7 +2,7 @@
 
 ## 📊 Overview
 
-A comprehensive Pine Script v5 indicator for TradingView that automatically detects and visualizes multiple advanced technical analysis patterns directly on candlestick charts. This tool integrates Elliott Wave Theory, Harmonic Patterns, Wyckoff Analysis, Dow Theory, and Master Pattern recognition into a single, highly configurable system.
+A comprehensive Pine Script v6 indicator for TradingView that automatically detects and visualizes multiple advanced technical analysis patterns directly on candlestick charts. This tool integrates Elliott Wave Theory, Harmonic Patterns, Wyckoff Analysis, Dow Theory, and Master Pattern recognition into a single, highly configurable system.
 
 ## 🎯 Core Features
 

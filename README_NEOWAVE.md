@@ -2,7 +2,7 @@
 
 ## 📊 Overview
 
-완전한 **NEoWave (Neely Elliott Wave) 분석 시스템**으로, Glenn Neely의 "Mastering Elliott Wave" 방법론을 Pine Script v5로 구현했습니다. 이 시스템은 기존 Elliott Wave 이론을 개선하여 더 정확하고 객관적인 파동 분석을 제공합니다.
+완전한 **NEoWave (Neely Elliott Wave) 분석 시스템**으로, Glenn Neely의 "Mastering Elliott Wave" 방법론을 Pine Script v6로 구현했습니다. 이 시스템은 기존 Elliott Wave 이론을 개선하여 더 정확하고 객관적인 파동 분석을 제공합니다.
 
 ## 🎯 핵심 개념
 

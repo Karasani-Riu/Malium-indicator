@@ -1,4 +1,4 @@
-//@version=5
+//@version=6
 indicator("NEoWave Analysis - Glenn Neely Method", shorttitle="NEoWave", overlay=true, max_lines_count=500, max_labels_count=500)
 
 // ═══════════════════════════════════════════════════════════════════════════════
