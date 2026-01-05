@@ -15,6 +15,19 @@ show_elliott_triangle = input.bool(true, title="  ↳ Show Triangle Waves (ABCDE
 show_truncated = input.bool(true, title="  ↳ Show Truncated Wave 5 (5T)", group=group_toggles)
 show_diagonal = input.bool(true, title="  ↳ Show Diagonal Patterns", group=group_toggles)
 
+// NEoWave Advanced Patterns (Glenn Neely)
+show_neowave_advanced = input.bool(true, title="Show NEoWave Advanced Patterns", group=group_toggles)
+show_diametric = input.bool(true, title="  ↳ Show Diametric Formation (7-wave)", group=group_toggles)
+show_extracting_triangle = input.bool(true, title="  ↳ Show Extracting Triangle", group=group_toggles)
+show_neutral_triangle = input.bool(true, title="  ↳ Show Neutral Triangle", group=group_toggles)
+show_terminal_5th = input.bool(true, title="  ↳ Show 5th Failure Terminal", group=group_toggles)
+
+// Chart Patterns (Bulkowski)
+show_chart_patterns = input.bool(true, title="Show Chart Patterns", group=group_toggles)
+show_head_shoulders = input.bool(true, title="  ↳ Show Head & Shoulders", group=group_toggles)
+show_double_patterns = input.bool(true, title="  ↳ Show Double Top/Bottom", group=group_toggles)
+show_cup_handle = input.bool(true, title="  ↳ Show Cup with Handle", group=group_toggles)
+
 show_harmonic = input.bool(true, title="Show Harmonic Patterns", group=group_toggles)
 show_wyckoff = input.bool(true, title="Show Wyckoff Phases", group=group_toggles)
 show_dow = input.bool(true, title="Show Dow Theory", group=group_toggles)
@@ -61,6 +74,8 @@ color_master_trend = input.color(color.new(color.teal, 0), title="Master Pattern
 color_kondratiev = input.color(color.new(color.navy, 0), title="Kondratiev Wave Color", group=group_colors)
 color_deep_cycle = input.color(color.new(color.maroon, 0), title="Deep Depth Cycle Color", group=group_colors)
 color_livermore = input.color(color.new(color.olive, 70), title="Livermore Cylinder Color", group=group_colors)
+color_neowave = input.color(color.new(color.fuchsia, 0), title="NEoWave Advanced Pattern Color", group=group_colors)
+color_chart_pattern = input.color(color.new(color.aqua, 0), title="Chart Pattern Color", group=group_colors)
 
 // --- Advanced Settings ---
 var group_advanced = "Advanced Settings"
@@ -71,6 +86,7 @@ debug_mode = input.bool(false, title="Debug Mode", group=group_advanced, tooltip
 // II. FIBONACCI RATIOS & CONSTANTS (피보나치 상수)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Traditional Fibonacci Ratios
 var float FIB_0236 = 0.236
 var float FIB_0382 = 0.382
 var float FIB_0500 = 0.500
@@ -85,6 +101,22 @@ var float FIB_1618 = 1.618
 var float FIB_2000 = 2.000
 var float FIB_2240 = 2.240
 var float FIB_2618 = 2.618
+
+// Ian Copsey Harmonic Elliott Wave Ratios (Advanced)
+var float FIB_0414 = 0.414  // √2 ratio - 41.4%
+var float FIB_0586 = 0.586  // Complementary √2 ratio - 58.6%
+var float FIB_1236 = 1.236  // 123.6%
+var float FIB_1382 = 1.382  // 138.2%
+var float FIB_1667 = 1.667  // 166.7%
+var float FIB_1764 = 1.764  // 176.4% - Very frequent Wave (iii) target
+var float FIB_1854 = 1.854  // 185.4% - Very frequent Wave (iii) target
+var float FIB_1900 = 1.9002 // 190.02% - Wave (iii) target
+var float FIB_2236 = 2.236  // 223.6% - Common Wave (iii) extension
+var float FIB_2382 = 2.382  // 238.2%
+var float FIB_2764 = 2.764  // 276.4% - Frequent Wave (iii) target
+var float FIB_2854 = 2.854  // 285.4% - Frequent Wave (iii) target
+var float FIB_3618 = 3.618  // 361.8%
+var float FIB_4236 = 4.236  // 423.6%
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // III. ZIGZAG CALCULATION (지그재그 계산)
@@ -1080,7 +1112,362 @@ f_detect_livermore_cylinder() =>
                     text_valign=text.align_center)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// XIII. MAIN EXECUTION (메인 실행)
+// XIII. NEOWAVE ADVANCED PATTERNS (NEo파동 고급 패턴)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Detect Diametric Formation (7-wave pattern - Glenn Neely discovery)
+f_detect_diametric_formation() =>
+    if array.size(zz_price) >= 8 and show_neowave_advanced and show_diametric
+        size = array.size(zz_price)
+
+        // Get last 8 pivots for 7-wave pattern (0-A-B-C-D-E-F-G)
+        p0 = array.get(zz_price, size - 8)
+        p1 = array.get(zz_price, size - 7)  // A
+        p2 = array.get(zz_price, size - 6)  // B
+        p3 = array.get(zz_price, size - 5)  // C
+        p4 = array.get(zz_price, size - 4)  // D
+        p5 = array.get(zz_price, size - 3)  // E
+        p6 = array.get(zz_price, size - 2)  // F
+        p7 = array.get(zz_price, size - 1)  // G
+
+        b0 = array.get(zz_bar, size - 8)
+        b1 = array.get(zz_bar, size - 7)
+        b2 = array.get(zz_bar, size - 6)
+        b3 = array.get(zz_bar, size - 5)
+        b4 = array.get(zz_bar, size - 4)
+        b5 = array.get(zz_bar, size - 3)
+        b6 = array.get(zz_bar, size - 2)
+        b7 = array.get(zz_bar, size - 1)
+
+        // Calculate wave sizes
+        wave_d = math.abs(p4 - p3)
+        wave_e = math.abs(p5 - p4)
+
+        // Critical Diametric Rule: Wave-E becomes larger than Wave-D
+        // (violates contracting triangle rules)
+        is_diametric = wave_e > wave_d
+
+        // Velocity check: Wave-E does NOT move quickly enough for zigzag
+        e_velocity = wave_e / math.max(b5 - b4, 1)
+        d_velocity = wave_d / math.max(b4 - b3, 1)
+        zigzag_threshold = d_velocity * 1.5
+
+        not_zigzag = e_velocity < zigzag_threshold
+
+        if is_diametric and not_zigzag
+            // Draw Diametric Formation with "bow tie" shape
+            line.new(b0, p0, b1, p1, color=color_neowave, width=2)
+            line.new(b1, p1, b2, p2, color=color_neowave, width=2)
+            line.new(b2, p2, b3, p3, color=color_neowave, width=2)
+            line.new(b3, p3, b4, p4, color=color_neowave, width=2)
+            line.new(b4, p4, b5, p5, color=color_neowave, width=2)
+            line.new(b5, p5, b6, p6, color=color_neowave, width=2)
+            line.new(b6, p6, b7, p7, color=color_neowave, width=2)
+
+            // Label waves A-G
+            is_bullish = p1 > p0
+            label.new(b1, p1, "A", style=is_bullish ? label.style_label_up : label.style_label_down,
+                     color=color_neowave, textcolor=color.white, size=size.tiny)
+            label.new(b2, p2, "B", style=is_bullish ? label.style_label_down : label.style_label_up,
+                     color=color_neowave, textcolor=color.white, size=size.tiny)
+            label.new(b3, p3, "C", style=is_bullish ? label.style_label_up : label.style_label_down,
+                     color=color_neowave, textcolor=color.white, size=size.tiny)
+            label.new(b4, p4, "D", style=is_bullish ? label.style_label_down : label.style_label_up,
+                     color=color_neowave, textcolor=color.white, size=size.tiny)
+            label.new(b5, p5, "E", style=is_bullish ? label.style_label_up : label.style_label_down,
+                     color=color_neowave, textcolor=color.white, size=size.tiny)
+            label.new(b6, p6, "F", style=is_bullish ? label.style_label_down : label.style_label_up,
+                     color=color_neowave, textcolor=color.white, size=size.tiny)
+            label.new(b7, p7, "G", style=is_bullish ? label.style_label_up : label.style_label_down,
+                     color=color_neowave, textcolor=color.white, size=size.tiny)
+
+            // Add pattern label
+            label.new(b4, p4 + (is_bullish ? atr_value * 3 : -atr_value * 3),
+                     "DIAMETRIC\n7-Wave Formation",
+                     style=label.style_none, textcolor=color_neowave, size=size.normal,
+                     tooltip="NEoWave Diametric: Wave-E > Wave-D, indicating complex correction")
+
+// Detect Extracting Triangle (Glenn Neely - higher highs & higher lows)
+f_detect_extracting_triangle() =>
+    if array.size(zz_price) >= 6 and show_neowave_advanced and show_extracting_triangle
+        size = array.size(zz_price)
+
+        p0 = array.get(zz_price, size - 6)
+        p1 = array.get(zz_price, size - 5)  // A
+        p2 = array.get(zz_price, size - 4)  // B
+        p3 = array.get(zz_price, size - 3)  // C
+        p4 = array.get(zz_price, size - 2)  // D
+        p5 = array.get(zz_price, size - 1)  // E
+
+        b0 = array.get(zz_bar, size - 6)
+        b1 = array.get(zz_bar, size - 5)
+        b2 = array.get(zz_bar, size - 4)
+        b3 = array.get(zz_bar, size - 3)
+        b4 = array.get(zz_bar, size - 2)
+        b5 = array.get(zz_bar, size - 1)
+
+        d0 = array.get(zz_direction, size - 6)
+        is_bullish = d0 == -1  // Starting from low
+
+        // CRITICAL RULE: Wave-D ALWAYS larger than Wave-C
+        wave_c = math.abs(p3 - p2)
+        wave_d = math.abs(p4 - p3)
+        wave_d_larger = wave_d > wave_c
+
+        // Price progression check: Higher lows AND higher highs
+        higher_lows = is_bullish ? (p2 > p0 and p4 > p2) : (p2 < p0 and p4 < p2)
+        higher_highs = is_bullish ? (p3 > p1 and p5 > p3) : (p3 < p1 and p5 < p3)
+
+        extracting_price_action = higher_lows and higher_highs
+
+        if wave_d_larger and extracting_price_action
+            // Draw Extracting Triangle
+            line.new(b0, p0, b1, p1, color=color_neowave, width=2)
+            line.new(b1, p1, b2, p2, color=color_neowave, width=2)
+            line.new(b2, p2, b3, p3, color=color_neowave, width=2)
+            line.new(b3, p3, b4, p4, color=color_neowave, width=2)
+            line.new(b4, p4, b5, p5, color=color_neowave, width=2)
+
+            // Labels
+            label.new(b1, p1, "A", style=is_bullish ? label.style_label_down : label.style_label_up,
+                     color=color_neowave, textcolor=color.white, size=size.tiny)
+            label.new(b2, p2, "B", style=is_bullish ? label.style_label_up : label.style_label_down,
+                     color=color_neowave, textcolor=color.white, size=size.tiny)
+            label.new(b3, p3, "C", style=is_bullish ? label.style_label_down : label.style_label_up,
+                     color=color_neowave, textcolor=color.white, size=size.tiny)
+            label.new(b4, p4, "D", style=is_bullish ? label.style_label_up : label.style_label_down,
+                     color=color_neowave, textcolor=color.white, size=size.tiny,
+                     tooltip="Wave-D is ALWAYS larger than Wave-C in Extracting Triangle")
+            label.new(b5, p5, "E", style=is_bullish ? label.style_label_down : label.style_label_up,
+                     color=color_neowave, textcolor=color.white, size=size.tiny)
+
+            label.new(b3, p3 + (is_bullish ? atr_value * 2.5 : -atr_value * 2.5),
+                     "EXTRACTING △\nHigher Highs & Lows",
+                     style=label.style_none, textcolor=color_neowave, size=size.small)
+
+// Detect Neutral Triangle (C-wave longest)
+f_detect_neutral_triangle() =>
+    if array.size(zz_price) >= 6 and show_neowave_advanced and show_neutral_triangle
+        size = array.size(zz_price)
+
+        p0 = array.get(zz_price, size - 6)
+        p1 = array.get(zz_price, size - 5)
+        p2 = array.get(zz_price, size - 4)
+        p3 = array.get(zz_price, size - 3)
+        p4 = array.get(zz_price, size - 2)
+        p5 = array.get(zz_price, size - 1)
+
+        b0 = array.get(zz_bar, size - 6)
+        b3 = array.get(zz_bar, size - 3)
+
+        // Calculate wave sizes
+        wave_a = math.abs(p1 - p0)
+        wave_c = math.abs(p3 - p2)
+        wave_e = math.abs(p5 - p4)
+        wave_b = math.abs(p2 - p1)
+        wave_d = math.abs(p4 - p3)
+
+        // Neutral Triangle Rules:
+        // - Wave-C is longest in direction of trend
+        // - Wave-D is longest against trend (usually longest overall)
+        c_is_longest_with_trend = wave_c == math.max(wave_a, math.max(wave_c, wave_e))
+        d_is_longest_against_trend = wave_d == math.max(wave_b, wave_d)
+
+        // Behavior: Low volatility (calm, consistent)
+        price_range = math.max(p1, math.max(p3, p5)) - math.min(p0, math.min(p2, p4))
+        time_span = b3 - b0
+        avg_volatility = price_range / math.max(time_span, 1)
+
+        low_volatility = avg_volatility < atr_value * 0.5  // Calm behavior
+
+        if c_is_longest_with_trend and d_is_longest_against_trend and low_volatility
+            d0 = array.get(zz_direction, size - 6)
+            is_bullish = d0 == -1
+
+            label.new(b3, p3 + (is_bullish ? atr_value * 2 : -atr_value * 2),
+                     "NEUTRAL △\nC-Wave Extension",
+                     style=label.style_none, textcolor=color_neowave, size=size.small,
+                     tooltip="Neutral Triangle: C-wave longest (like 3rd wave extension)")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// XIV. CHART PATTERNS - HEAD & SHOULDERS (차트 패턴 - 헤드앤숄더)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Detect Head and Shoulders Top/Bottom (Bulkowski statistical pattern)
+f_detect_head_shoulders() =>
+    if array.size(zz_price) >= 6 and show_chart_patterns and show_head_shoulders
+        size = array.size(zz_price)
+
+        // Need 5 pivots: Left Shoulder - Head - Right Shoulder (with valleys between)
+        p0 = array.get(zz_price, size - 6)  // Start
+        p1 = array.get(zz_price, size - 5)  // Left Shoulder
+        p2 = array.get(zz_price, size - 4)  // Valley 1
+        p3 = array.get(zz_price, size - 3)  // Head
+        p4 = array.get(zz_price, size - 2)  // Valley 2
+        p5 = array.get(zz_price, size - 1)  // Right Shoulder
+
+        b0 = array.get(zz_bar, size - 6)
+        b1 = array.get(zz_bar, size - 5)
+        b2 = array.get(zz_bar, size - 4)
+        b3 = array.get(zz_bar, size - 3)
+        b4 = array.get(zz_bar, size - 2)
+        b5 = array.get(zz_bar, size - 1)
+
+        d1 = array.get(zz_direction, size - 5)
+
+        // HEAD & SHOULDERS TOP: Head is highest
+        if d1 == 1  // Starting with peak
+            // Rule: Head must be higher than both shoulders
+            head_highest = p3 > p1 and p3 > p5
+
+            // Rule: Shoulders should be approximately equal (within tolerance)
+            shoulder_symmetry = math.abs(p1 - p5) / p1 < 0.1  // Within 10%
+
+            // Neckline should be near-horizontal (not too steep)
+            neckline_slope = math.abs(p4 - p2) / p2
+            near_horizontal = neckline_slope < 0.15  // Within 15%
+
+            if head_highest and shoulder_symmetry and near_horizontal
+                // Draw pattern
+                line.new(b0, p0, b1, p1, color=color_chart_pattern, width=2)
+                line.new(b1, p1, b2, p2, color=color_chart_pattern, width=2)
+                line.new(b2, p2, b3, p3, color=color_chart_pattern, width=2)
+                line.new(b3, p3, b4, p4, color=color_chart_pattern, width=2)
+                line.new(b4, p4, b5, p5, color=color_chart_pattern, width=2)
+
+                // Draw neckline
+                neckline_price = (p2 + p4) / 2
+                line.new(b2, p2, b4, p4, color=color_chart_pattern, width=1, style=line.style_dashed)
+
+                // Calculate target using measure rule
+                pattern_height = p3 - neckline_price
+                target = neckline_price - pattern_height
+
+                // Labels
+                label.new(b1, p1, "LS", style=label.style_label_down,
+                         color=color_chart_pattern, textcolor=color.white, size=size.tiny)
+                label.new(b3, p3, "HEAD", style=label.style_label_down,
+                         color=color_chart_pattern, textcolor=color.white, size=size.normal)
+                label.new(b5, p5, "RS", style=label.style_label_down,
+                         color=color_chart_pattern, textcolor=color.white, size=size.tiny)
+
+                label.new(b3, p3 + atr_value * 2,
+                         "HEAD & SHOULDERS TOP\nTarget: " + str.tostring(target, format.mintick),
+                         style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
+                         tooltip="Bearish reversal pattern | Success rate: 83% (Bulkowski)")
+
+        // HEAD & SHOULDERS BOTTOM: Head is lowest
+        if d1 == -1  // Starting with valley
+            // Rule: Head must be lower than both shoulders
+            head_lowest = p3 < p1 and p3 < p5
+
+            shoulder_symmetry = math.abs(p1 - p5) / p1 < 0.1
+
+            neckline_slope = math.abs(p4 - p2) / p2
+            near_horizontal = neckline_slope < 0.15
+
+            if head_lowest and shoulder_symmetry and near_horizontal
+                // Draw pattern
+                line.new(b0, p0, b1, p1, color=color_chart_pattern, width=2)
+                line.new(b1, p1, b2, p2, color=color_chart_pattern, width=2)
+                line.new(b2, p2, b3, p3, color=color_chart_pattern, width=2)
+                line.new(b3, p3, b4, p4, color=color_chart_pattern, width=2)
+                line.new(b4, p4, b5, p5, color=color_chart_pattern, width=2)
+
+                // Draw neckline
+                neckline_price = (p2 + p4) / 2
+                line.new(b2, p2, b4, p4, color=color_chart_pattern, width=1, style=line.style_dashed)
+
+                // Calculate target
+                pattern_height = neckline_price - p3
+                target = neckline_price + pattern_height
+
+                label.new(b1, p1, "LS", style=label.style_label_up,
+                         color=color_chart_pattern, textcolor=color.white, size=size.tiny)
+                label.new(b3, p3, "HEAD", style=label.style_label_up,
+                         color=color_chart_pattern, textcolor=color.white, size=size.normal)
+                label.new(b5, p5, "RS", style=label.style_label_up,
+                         color=color_chart_pattern, textcolor=color.white, size=size.tiny)
+
+                label.new(b3, p3 - atr_value * 2,
+                         "HEAD & SHOULDERS BOTTOM\nTarget: " + str.tostring(target, format.mintick),
+                         style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
+                         tooltip="Bullish reversal pattern | Success rate: 87% (Bulkowski)")
+
+// Detect Double Top/Bottom (with Adam & Eve variations)
+f_detect_double_patterns() =>
+    if array.size(zz_price) >= 4 and show_chart_patterns and show_double_patterns
+        size = array.size(zz_price)
+
+        p0 = array.get(zz_price, size - 4)
+        p1 = array.get(zz_price, size - 3)  // First peak/valley
+        p2 = array.get(zz_price, size - 2)  // Middle valley/peak
+        p3 = array.get(zz_price, size - 1)  // Second peak/valley
+
+        b0 = array.get(zz_bar, size - 4)
+        b1 = array.get(zz_bar, size - 3)
+        b2 = array.get(zz_bar, size - 2)
+        b3 = array.get(zz_bar, size - 1)
+
+        d1 = array.get(zz_direction, size - 3)
+
+        // DOUBLE TOP
+        if d1 == 1
+            // Peaks should be approximately equal (within 3%)
+            peaks_equal = math.abs(p1 - p3) / p1 < 0.03
+
+            // Second peak should not exceed first
+            second_not_higher = p3 <= p1 * 1.01
+
+            if peaks_equal and second_not_higher
+                // Determine Adam/Eve pattern based on sharpness
+                bars_to_first = b1 - b0
+                bars_to_second = b3 - b2
+
+                first_sharp = bars_to_first < 15  // Adam = sharp, narrow
+                second_sharp = bars_to_second < 15
+
+                pattern_type = first_sharp and second_sharp ? "Adam & Adam" :
+                               first_sharp and not second_sharp ? "Adam & Eve" :
+                               not first_sharp and second_sharp ? "Eve & Adam" : "Eve & Eve"
+
+                // Calculate target
+                neckline = p2
+                pattern_height = p1 - neckline
+                target = neckline - pattern_height
+
+                label.new(b2, p2 + atr_value * 2,
+                         "DOUBLE TOP\n" + pattern_type + "\nTarget: " + str.tostring(target, format.mintick),
+                         style=label.style_none, textcolor=color_chart_pattern, size=size.small,
+                         tooltip="Bearish reversal | Best: Eve & Eve (50% avg decline)")
+
+        // DOUBLE BOTTOM
+        if d1 == -1
+            valleys_equal = math.abs(p1 - p3) / p1 < 0.03
+            second_not_lower = p3 >= p1 * 0.99
+
+            if valleys_equal and second_not_lower
+                bars_to_first = b1 - b0
+                bars_to_second = b3 - b2
+
+                first_sharp = bars_to_first < 15
+                second_sharp = bars_to_second < 15
+
+                pattern_type = first_sharp and second_sharp ? "Adam & Adam" :
+                               first_sharp and not second_sharp ? "Adam & Eve" :
+                               not first_sharp and second_sharp ? "Eve & Adam" : "Eve & Eve"
+
+                neckline = p2
+                pattern_height = neckline - p1
+                target = neckline + pattern_height
+
+                label.new(b2, p2 - atr_value * 2,
+                         "DOUBLE BOTTOM\n" + pattern_type + "\nTarget: " + str.tostring(target, format.mintick),
+                         style=label.style_none, textcolor=color_chart_pattern, size=size.small,
+                         tooltip="Bullish reversal | Best: Eve & Eve (50% avg rise)")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// XV. MAIN EXECUTION (메인 실행)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Execute pattern detection functions
@@ -1090,6 +1477,15 @@ if barstate.islast or barstate.isrealtime
     f_detect_corrective_wave()
     f_detect_connecting_wave_wxy()
     f_detect_triangle_wave()
+
+    // NEoWave Advanced Patterns (Glenn Neely)
+    f_detect_diametric_formation()
+    f_detect_extracting_triangle()
+    f_detect_neutral_triangle()
+
+    // Chart Patterns (Bulkowski)
+    f_detect_head_shoulders()
+    f_detect_double_patterns()
 
     // Harmonic patterns
     f_detect_gartley()
