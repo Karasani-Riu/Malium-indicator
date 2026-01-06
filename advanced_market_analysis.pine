@@ -7,6 +7,12 @@ indicator("Advanced Market Analysis & Pattern Detection", shorttitle="AMA", over
 
 // --- Pattern Display Toggles ---
 var group_toggles = "Pattern Display Toggles"
+
+// Fractal Elliott Wave Settings
+show_fractal_elliott = input.bool(true, title="Show Fractal Elliott Waves", group=group_toggles)
+show_major_waves = input.bool(true, title="  ↳ Show Major Waves (1-5, A-C) [Bold]", group=group_toggles)
+show_minor_waves = input.bool(true, title="  ↳ Show Minor Waves (i-v, a-c) [Small]", group=group_toggles)
+
 show_elliott = input.bool(true, title="Show Elliott Waves", group=group_toggles)
 show_elliott_impulse = input.bool(true, title="  ↳ Show Impulse Waves (1-5)", group=group_toggles)
 show_elliott_corrective = input.bool(true, title="  ↳ Show Corrective Waves (ABC)", group=group_toggles)
@@ -36,19 +42,34 @@ show_kondratiev = input.bool(true, title="Show Kondratiev Wave", group=group_tog
 show_deep_cycle = input.bool(true, title="Show Deep Depth Cycle", group=group_toggles)
 show_livermore = input.bool(true, title="Show Livermore Accumulation Cylinder", group=group_toggles)
 
-// --- ZigZag Parameters ---
+// --- Dual ZigZag Parameters (프랙탈 구조용) ---
 var group_zigzag = "ZigZag Settings"
+
+// Major ZigZag (대파동 감지용 - 큰 흐름)
+major_zigzag_depth = input.int(20, title="Major ZigZag Depth", minval=5, maxval=50, group=group_zigzag, tooltip="대파동(1-5, A-C) 감지용 - 더 큰 값")
+major_zigzag_deviation = input.float(8.0, title="Major ZigZag Deviation %", minval=3.0, maxval=20.0, step=0.5, group=group_zigzag, tooltip="대파동 최소 가격 변화율 - 더 큰 값")
+
+// Minor ZigZag (소파동 감지용 - 세부 흐름)
+minor_zigzag_depth = input.int(8, title="Minor ZigZag Depth", minval=1, maxval=30, group=group_zigzag, tooltip="소파동(i-v, a-c) 감지용 - 더 작은 값")
+minor_zigzag_deviation = input.float(3.0, title="Minor ZigZag Deviation %", minval=0.5, maxval=10.0, step=0.5, group=group_zigzag, tooltip="소파동 최소 가격 변화율 - 더 작은 값")
+
+// Legacy ZigZag (기존 패턴용)
 zigzag_depth = input.int(12, title="ZigZag Depth", minval=1, group=group_zigzag, tooltip="Number of bars for pivot detection")
 zigzag_deviation = input.float(5.0, title="ZigZag Deviation %", minval=0.1, group=group_zigzag, tooltip="Minimum price change percentage")
 
 // --- Harmonic Pattern Parameters ---
 var group_harmonic = "Harmonic Pattern Settings"
-fib_tolerance = input.float(0.15, title="Fibonacci Tolerance", minval=0.05, maxval=0.30, step=0.01, group=group_harmonic, tooltip="Tolerance for Fibonacci ratio matching (±)")
+fib_tolerance_min = input.float(0.11, title="Min Fibonacci Tolerance", minval=0.05, maxval=0.20, step=0.01, group=group_harmonic, tooltip="Minimum tolerance for tight Fibonacci matching (±0.11)")
+fib_tolerance_max = input.float(0.22, title="Max Fibonacci Tolerance", minval=0.10, maxval=0.30, step=0.01, group=group_harmonic, tooltip="Maximum tolerance for flexible Fibonacci matching (±0.22)")
 show_potential = input.bool(true, title="Show Potential Patterns", group=group_harmonic, tooltip="Display patterns in formation with dashed lines")
+
+// Legacy tolerance for backward compatibility
+fib_tolerance = (fib_tolerance_min + fib_tolerance_max) / 2
 
 // --- Kondratiev Wave Parameters ---
 var group_kondratiev = "Kondratiev Wave Settings"
 kondratiev_lookback = input.int(250, title="Lookback Period (Bars)", minval=50, maxval=1000, group=group_kondratiev, tooltip="Historical bars to analyze for cycle detection")
+kondratiev_show_background = input.bool(true, title="Show Seasonal Background Tint", group=group_kondratiev, tooltip="Display subtle background color based on Kondratiev season")
 
 // --- Deep Depth Cycle Parameters ---
 var group_deep_cycle = "Deep Depth Cycle Settings"
@@ -60,6 +81,7 @@ cycle_long = input.int(100, title="Long Cycle Length", minval=50, maxval=500, gr
 var group_livermore = "Livermore Cylinder Settings"
 cylinder_min_bars = input.int(10, title="Minimum Consolidation Bars", minval=5, maxval=50, group=group_livermore, tooltip="Minimum bars for cylinder formation")
 cylinder_range_pct = input.float(3.0, title="Max Range %", minval=1.0, maxval=10.0, step=0.5, group=group_livermore, tooltip="Maximum price range % for cylinder")
+cylinder_breakout_volume_mult = input.float(1.5, title="Breakout Volume Multiplier", minval=1.0, maxval=3.0, step=0.1, group=group_livermore, tooltip="Volume must be this multiple of average for confirmed breakout")
 
 // --- Color Settings ---
 var group_colors = "Color Settings"
@@ -185,11 +207,373 @@ if not na(pl)
             last_pivot_bar := bar_index - zigzag_depth
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// III-B. DUAL ZIGZAG ENGINE (이중 지그재그 엔진 - 프랙탈 구조용)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Major ZigZag Arrays (대파동 - Bold 1,2,3,4,5 and A,B,C)
+var float[] major_zz_price = array.new_float(0)
+var int[] major_zz_bar = array.new_int(0)
+var int[] major_zz_direction = array.new_int(0)  // 1 = high, -1 = low
+
+// Minor ZigZag Arrays (소파동 - Small i,ii,iii,iv,v and a,b,c)
+var float[] minor_zz_price = array.new_float(0)
+var int[] minor_zz_bar = array.new_int(0)
+var int[] minor_zz_direction = array.new_int(0)
+
+// Major ZigZag State
+var float major_last_pivot_price = na
+var int major_last_pivot_bar = na
+var int major_last_pivot_dir = na
+
+// Minor ZigZag State
+var float minor_last_pivot_price = na
+var int minor_last_pivot_bar = na
+var int minor_last_pivot_dir = na
+
+// Calculate Major ZigZag (대파동 탐지)
+major_ph = f_pivothigh(major_zigzag_depth)
+major_pl = f_pivotlow(major_zigzag_depth)
+
+if not na(major_ph)
+    major_price_change = na(major_last_pivot_price) ? 100.0 : math.abs((major_ph - major_last_pivot_price) / major_last_pivot_price * 100)
+    if na(major_last_pivot_dir) or major_last_pivot_dir == -1
+        if na(major_last_pivot_price) or major_price_change >= major_zigzag_deviation
+            array.push(major_zz_price, major_ph)
+            array.push(major_zz_bar, bar_index - major_zigzag_depth)
+            array.push(major_zz_direction, 1)
+            major_last_pivot_price := major_ph
+            major_last_pivot_bar := bar_index - major_zigzag_depth
+            major_last_pivot_dir := 1
+            if array.size(major_zz_price) > 50
+                array.shift(major_zz_price)
+                array.shift(major_zz_bar)
+                array.shift(major_zz_direction)
+    else if major_last_pivot_dir == 1
+        if major_ph > major_last_pivot_price
+            array.set(major_zz_price, array.size(major_zz_price) - 1, major_ph)
+            array.set(major_zz_bar, array.size(major_zz_bar) - 1, bar_index - major_zigzag_depth)
+            major_last_pivot_price := major_ph
+            major_last_pivot_bar := bar_index - major_zigzag_depth
+
+if not na(major_pl)
+    major_price_change = na(major_last_pivot_price) ? 100.0 : math.abs((major_pl - major_last_pivot_price) / major_last_pivot_price * 100)
+    if na(major_last_pivot_dir) or major_last_pivot_dir == 1
+        if na(major_last_pivot_price) or major_price_change >= major_zigzag_deviation
+            array.push(major_zz_price, major_pl)
+            array.push(major_zz_bar, bar_index - major_zigzag_depth)
+            array.push(major_zz_direction, -1)
+            major_last_pivot_price := major_pl
+            major_last_pivot_bar := bar_index - major_zigzag_depth
+            major_last_pivot_dir := -1
+            if array.size(major_zz_price) > 50
+                array.shift(major_zz_price)
+                array.shift(major_zz_bar)
+                array.shift(major_zz_direction)
+    else if major_last_pivot_dir == -1
+        if major_pl < major_last_pivot_price
+            array.set(major_zz_price, array.size(major_zz_price) - 1, major_pl)
+            array.set(major_zz_bar, array.size(major_zz_bar) - 1, bar_index - major_zigzag_depth)
+            major_last_pivot_price := major_pl
+            major_last_pivot_bar := bar_index - major_zigzag_depth
+
+// Calculate Minor ZigZag (소파동 탐지)
+minor_ph = f_pivothigh(minor_zigzag_depth)
+minor_pl = f_pivotlow(minor_zigzag_depth)
+
+if not na(minor_ph)
+    minor_price_change = na(minor_last_pivot_price) ? 100.0 : math.abs((minor_ph - minor_last_pivot_price) / minor_last_pivot_price * 100)
+    if na(minor_last_pivot_dir) or minor_last_pivot_dir == -1
+        if na(minor_last_pivot_price) or minor_price_change >= minor_zigzag_deviation
+            array.push(minor_zz_price, minor_ph)
+            array.push(minor_zz_bar, bar_index - minor_zigzag_depth)
+            array.push(minor_zz_direction, 1)
+            minor_last_pivot_price := minor_ph
+            minor_last_pivot_bar := bar_index - minor_zigzag_depth
+            minor_last_pivot_dir := 1
+            if array.size(minor_zz_price) > 100
+                array.shift(minor_zz_price)
+                array.shift(minor_zz_bar)
+                array.shift(minor_zz_direction)
+    else if minor_last_pivot_dir == 1
+        if minor_ph > minor_last_pivot_price
+            array.set(minor_zz_price, array.size(minor_zz_price) - 1, minor_ph)
+            array.set(minor_zz_bar, array.size(minor_zz_bar) - 1, bar_index - minor_zigzag_depth)
+            minor_last_pivot_price := minor_ph
+            minor_last_pivot_bar := bar_index - minor_zigzag_depth
+
+if not na(minor_pl)
+    minor_price_change = na(minor_last_pivot_price) ? 100.0 : math.abs((minor_pl - minor_last_pivot_price) / minor_last_pivot_price * 100)
+    if na(minor_last_pivot_dir) or minor_last_pivot_dir == 1
+        if na(minor_last_pivot_price) or minor_price_change >= minor_zigzag_deviation
+            array.push(minor_zz_price, minor_pl)
+            array.push(minor_zz_bar, bar_index - minor_zigzag_depth)
+            array.push(minor_zz_direction, -1)
+            minor_last_pivot_price := minor_pl
+            minor_last_pivot_bar := bar_index - minor_zigzag_depth
+            minor_last_pivot_dir := -1
+            if array.size(minor_zz_price) > 100
+                array.shift(minor_zz_price)
+                array.shift(minor_zz_bar)
+                array.shift(minor_zz_direction)
+    else if minor_last_pivot_dir == -1
+        if minor_pl < minor_last_pivot_price
+            array.set(minor_zz_price, array.size(minor_zz_price) - 1, minor_pl)
+            array.set(minor_zz_bar, array.size(minor_zz_bar) - 1, bar_index - minor_zigzag_depth)
+            minor_last_pivot_price := minor_pl
+            minor_last_pivot_bar := bar_index - minor_zigzag_depth
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// III-C. FRACTAL WAVE LABELING (프랙탈 파동 라벨링 - 계층적 구조)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Detect Major Impulse Waves (대파동 임펄스: 1, 2, 3, 4, 5)
+f_detect_major_impulse() =>
+    if array.size(major_zz_price) >= 6 and show_fractal_elliott and show_major_waves
+        size = array.size(major_zz_price)
+
+        // Get last 6 pivots for 5-wave pattern
+        p0 = array.get(major_zz_price, size - 6)
+        p1 = array.get(major_zz_price, size - 5)
+        p2 = array.get(major_zz_price, size - 4)
+        p3 = array.get(major_zz_price, size - 3)
+        p4 = array.get(major_zz_price, size - 2)
+        p5 = array.get(major_zz_price, size - 1)
+
+        b0 = array.get(major_zz_bar, size - 6)
+        b1 = array.get(major_zz_bar, size - 5)
+        b2 = array.get(major_zz_bar, size - 4)
+        b3 = array.get(major_zz_bar, size - 3)
+        b4 = array.get(major_zz_bar, size - 2)
+        b5 = array.get(major_zz_bar, size - 1)
+
+        d0 = array.get(major_zz_direction, size - 6)
+        is_bullish = d0 == -1  // Starting from low
+
+        // Elliott Wave Rules
+        wave1 = math.abs(p1 - p0)
+        wave2 = math.abs(p2 - p1)
+        wave3 = math.abs(p3 - p2)
+        wave4 = math.abs(p4 - p3)
+        wave5 = math.abs(p5 - p4)
+
+        retrace2 = wave2 / wave1
+        valid_wave2 = retrace2 < 1.0  // Wave 2 cannot retrace >100%
+        valid_wave3 = wave3 > wave1 or wave3 > wave5  // Wave 3 not shortest
+        valid_wave4 = is_bullish ? (p4 > p1) : (p4 < p1)  // Wave 4 no overlap
+
+        if valid_wave2 and valid_wave3 and valid_wave4
+            // Draw major impulse lines (bold)
+            line.new(b0, p0, b1, p1, color=color_impulse, width=3)
+            line.new(b1, p1, b2, p2, color=color_impulse, width=3)
+            line.new(b2, p2, b3, p3, color=color_impulse, width=3)
+            line.new(b3, p3, b4, p4, color=color_impulse, width=3)
+            line.new(b4, p4, b5, p5, color=color_impulse, width=3)
+
+            // Major wave labels (bold Arabic numerals, far from candles)
+            label_offset_major = atr_value * label_offset_multiplier * 3.0
+            label.new(b1, is_bullish ? p1 - label_offset_major : p1 + label_offset_major,
+                     "1", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_impulse, size=size.large, textalign=text.align_center)
+            label.new(b2, is_bullish ? p2 + label_offset_major : p2 - label_offset_major,
+                     "2", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_impulse, size=size.large, textalign=text.align_center)
+            label.new(b3, is_bullish ? p3 - label_offset_major : p3 + label_offset_major,
+                     "3", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_impulse, size=size.large, textalign=text.align_center)
+            label.new(b4, is_bullish ? p4 + label_offset_major : p4 - label_offset_major,
+                     "4", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_impulse, size=size.large, textalign=text.align_center)
+            label.new(b5, is_bullish ? p5 - label_offset_major : p5 + label_offset_major,
+                     "5", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_impulse, size=size.large, textalign=text.align_center)
+
+// Detect Major Corrective Waves (대파동 조정: A, B, C)
+f_detect_major_corrective() =>
+    if array.size(major_zz_price) >= 4 and show_fractal_elliott and show_major_waves
+        size = array.size(major_zz_price)
+
+        // Get last 4 pivots for ABC pattern
+        p0 = array.get(major_zz_price, size - 4)
+        p1 = array.get(major_zz_price, size - 3)
+        p2 = array.get(major_zz_price, size - 2)
+        p3 = array.get(major_zz_price, size - 1)
+
+        b0 = array.get(major_zz_bar, size - 4)
+        b1 = array.get(major_zz_bar, size - 3)
+        b2 = array.get(major_zz_bar, size - 2)
+        b3 = array.get(major_zz_bar, size - 1)
+
+        d0 = array.get(major_zz_direction, size - 4)
+        is_bullish = d0 == 1  // Corrective after uptrend
+
+        // ABC pattern validation
+        wave_a = math.abs(p1 - p0)
+        wave_b = math.abs(p2 - p1)
+        wave_c = math.abs(p3 - p2)
+
+        retrace_b = wave_b / wave_a
+        valid_abc = retrace_b > 0.236 and retrace_b < 1.0  // B retraces 23.6%-100% of A
+
+        if valid_abc
+            // Draw major corrective lines
+            line.new(b0, p0, b1, p1, color=color_corrective, width=3)
+            line.new(b1, p1, b2, p2, color=color_corrective, width=3)
+            line.new(b2, p2, b3, p3, color=color_corrective, width=3)
+
+            // Major corrective labels (bold uppercase, far from candles)
+            label_offset_major = atr_value * label_offset_multiplier * 3.0
+            label.new(b1, is_bullish ? p1 + label_offset_major : p1 - label_offset_major,
+                     "A", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_corrective, size=size.large, textalign=text.align_center)
+            label.new(b2, is_bullish ? p2 - label_offset_major : p2 + label_offset_major,
+                     "B", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_corrective, size=size.large, textalign=text.align_center)
+            label.new(b3, is_bullish ? p3 + label_offset_major : p3 - label_offset_major,
+                     "C", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_corrective, size=size.large, textalign=text.align_center)
+
+// Detect Minor Impulse Waves (소파동 임펄스: i, ii, iii, iv, v)
+f_detect_minor_impulse() =>
+    if array.size(minor_zz_price) >= 6 and show_fractal_elliott and show_minor_waves
+        size = array.size(minor_zz_price)
+
+        // Get last 6 pivots for sub-impulse pattern
+        p0 = array.get(minor_zz_price, size - 6)
+        p1 = array.get(minor_zz_price, size - 5)
+        p2 = array.get(minor_zz_price, size - 4)
+        p3 = array.get(minor_zz_price, size - 3)
+        p4 = array.get(minor_zz_price, size - 2)
+        p5 = array.get(minor_zz_price, size - 1)
+
+        b0 = array.get(minor_zz_bar, size - 6)
+        b1 = array.get(minor_zz_bar, size - 5)
+        b2 = array.get(minor_zz_bar, size - 4)
+        b3 = array.get(minor_zz_bar, size - 3)
+        b4 = array.get(minor_zz_bar, size - 2)
+        b5 = array.get(minor_zz_bar, size - 1)
+
+        d0 = array.get(minor_zz_direction, size - 6)
+        is_bullish = d0 == -1
+
+        // Sub-wave validation
+        wave1 = math.abs(p1 - p0)
+        wave2 = math.abs(p2 - p1)
+        wave3 = math.abs(p3 - p2)
+        wave4 = math.abs(p4 - p3)
+        wave5 = math.abs(p5 - p4)
+
+        retrace2 = wave2 / wave1
+        valid_wave2 = retrace2 < 1.0
+        valid_wave3 = wave3 > wave1 or wave3 > wave5
+        valid_wave4 = is_bullish ? (p4 > p1) : (p4 < p1)
+
+        if valid_wave2 and valid_wave3 and valid_wave4
+            // Draw minor impulse lines (thin)
+            line.new(b0, p0, b1, p1, color=color_impulse, width=1, style=line.style_dotted)
+            line.new(b1, p1, b2, p2, color=color_impulse, width=1, style=line.style_dotted)
+            line.new(b2, p2, b3, p3, color=color_impulse, width=1, style=line.style_dotted)
+            line.new(b3, p3, b4, p4, color=color_impulse, width=1, style=line.style_dotted)
+            line.new(b4, p4, b5, p5, color=color_impulse, width=1, style=line.style_dotted)
+
+            // Minor wave labels (lowercase Roman numerals, close to candles)
+            label_offset_minor = atr_value * label_offset_multiplier * 0.5
+            label.new(b1, is_bullish ? p1 - label_offset_minor : p1 + label_offset_minor,
+                     "i", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center)
+            label.new(b2, is_bullish ? p2 + label_offset_minor : p2 - label_offset_minor,
+                     "ii", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center)
+            label.new(b3, is_bullish ? p3 - label_offset_minor : p3 + label_offset_minor,
+                     "iii", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center)
+            label.new(b4, is_bullish ? p4 + label_offset_minor : p4 - label_offset_minor,
+                     "iv", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center)
+            label.new(b5, is_bullish ? p5 - label_offset_minor : p5 + label_offset_minor,
+                     "v", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center)
+
+// Detect Minor Corrective Waves (소파동 조정: a, b, c)
+f_detect_minor_corrective() =>
+    if array.size(minor_zz_price) >= 4 and show_fractal_elliott and show_minor_waves
+        size = array.size(minor_zz_price)
+
+        // Get last 4 pivots for abc pattern
+        p0 = array.get(minor_zz_price, size - 4)
+        p1 = array.get(minor_zz_price, size - 3)
+        p2 = array.get(minor_zz_price, size - 2)
+        p3 = array.get(minor_zz_price, size - 1)
+
+        b0 = array.get(minor_zz_bar, size - 4)
+        b1 = array.get(minor_zz_bar, size - 3)
+        b2 = array.get(minor_zz_bar, size - 2)
+        b3 = array.get(minor_zz_bar, size - 1)
+
+        d0 = array.get(minor_zz_direction, size - 4)
+        is_bullish = d0 == 1
+
+        // abc pattern validation
+        wave_a = math.abs(p1 - p0)
+        wave_b = math.abs(p2 - p1)
+        wave_c = math.abs(p3 - p2)
+
+        retrace_b = wave_b / wave_a
+        valid_abc = retrace_b > 0.236 and retrace_b < 1.0
+
+        if valid_abc
+            // Draw minor corrective lines
+            line.new(b0, p0, b1, p1, color=color_corrective, width=1, style=line.style_dotted)
+            line.new(b1, p1, b2, p2, color=color_corrective, width=1, style=line.style_dotted)
+            line.new(b2, p2, b3, p3, color=color_corrective, width=1, style=line.style_dotted)
+
+            // Minor corrective labels (lowercase letters, close to candles)
+            label_offset_minor = atr_value * label_offset_multiplier * 0.5
+            label.new(b1, is_bullish ? p1 + label_offset_minor : p1 - label_offset_minor,
+                     "a", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_corrective, size=size.tiny, textalign=text.align_center)
+            label.new(b2, is_bullish ? p2 - label_offset_minor : p2 + label_offset_minor,
+                     "b", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_corrective, size=size.tiny, textalign=text.align_center)
+            label.new(b3, is_bullish ? p3 + label_offset_minor : p3 - label_offset_minor,
+                     "c", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color_corrective, size=size.tiny, textalign=text.align_center)
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // IV. HELPER FUNCTIONS (헬퍼 함수)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Check if value is within tolerance of target
 f_within_tolerance(value, target, tolerance) =>
+    math.abs(value - target) <= tolerance
+
+// Enhanced flexible tolerance that prevents invading adjacent Fibonacci levels
+// Returns dynamic tolerance based on target and spacing between Fib levels
+f_flexible_tolerance(target, prev_level=na, next_level=na) =>
+    // Start with base tolerance range
+    base_tolerance = fib_tolerance_min
+    max_tolerance = fib_tolerance_max
+
+    // Calculate safe tolerance based on adjacent levels
+    safe_tolerance = max_tolerance
+
+    if not na(prev_level)
+        // Distance to previous level (e.g., 0.618 - 0.5 = 0.118)
+        dist_to_prev = math.abs(target - prev_level)
+        // Max safe tolerance is half the distance (to not cross midpoint)
+        safe_tolerance := math.min(safe_tolerance, dist_to_prev / 2)
+
+    if not na(next_level)
+        // Distance to next level (e.g., 0.786 - 0.618 = 0.168)
+        dist_to_next = math.abs(next_level - target)
+        safe_tolerance := math.min(safe_tolerance, dist_to_next / 2)
+
+    // Ensure tolerance is within min-max range
+    final_tolerance = math.max(base_tolerance, math.min(safe_tolerance, max_tolerance))
+    final_tolerance
+
+// Check if value matches target with flexible tolerance
+f_within_flexible_tolerance(value, target, prev_level=na, next_level=na) =>
+    tolerance = f_flexible_tolerance(target, prev_level, next_level)
     math.abs(value - target) <= tolerance
 
 // Calculate retracement ratio
@@ -452,19 +836,31 @@ f_detect_gartley() =>
         bcd = f_retracement(b, c, d)
         xad = f_retracement(x, a, d)
 
-        // Gartley ratios:
-        // XAB = 0.618
+        // Gartley ratios with flexible tolerance:
+        // XAB = 0.618 (between 0.5 and 0.786)
         // ABC = 0.382 - 0.886
         // BCD = 1.13 - 1.618
-        // XAD = 0.786
+        // XAD = 0.786 (between 0.618 and 1.0)
 
-        is_gartley = f_within_tolerance(xab, FIB_0618, fib_tolerance) and
-                     (abc >= FIB_0382 - fib_tolerance and abc <= FIB_0886 + fib_tolerance) and
-                     (bcd >= FIB_1130 - fib_tolerance and bcd <= FIB_1618 + fib_tolerance) and
-                     f_within_tolerance(xad, FIB_0786, fib_tolerance)
+        // Use flexible tolerance for key ratios
+        xab_match = f_within_flexible_tolerance(xab, FIB_0618, FIB_0500, FIB_0786)
+        xad_match = f_within_flexible_tolerance(xad, FIB_0786, FIB_0618, FIB_1000)
 
+        // Range checks with flexible tolerance
+        abc_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
+        abc_max_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
+        abc_match = (abc >= FIB_0382 - abc_min_tol and abc <= FIB_0886 + abc_max_tol)
+
+        bcd_min_tol = f_flexible_tolerance(FIB_1130, FIB_1000, FIB_1272)
+        bcd_max_tol = f_flexible_tolerance(FIB_1618, FIB_1414, FIB_2000)
+        bcd_match = (bcd >= FIB_1130 - bcd_min_tol and bcd <= FIB_1618 + bcd_max_tol)
+
+        is_gartley = xab_match and abc_match and bcd_match and xad_match
+
+        // Potential pattern with wider tolerance
         is_potential = (not is_gartley) and show_potential and
-                       f_within_tolerance(xab, FIB_0618, fib_tolerance * 1.5)
+                       f_within_tolerance(xab, FIB_0618, fib_tolerance_max * 1.2) and
+                       f_within_tolerance(xad, FIB_0786, fib_tolerance_max * 1.2)
 
         if is_gartley or is_potential
             line_style = is_gartley ? line.style_solid : line.style_dashed
@@ -513,19 +909,30 @@ f_detect_butterfly() =>
         bcd = f_extension(b, c, d)
         xad = f_extension(x, a, d)
 
-        // Butterfly ratios:
-        // XAB = 0.786
+        // Butterfly ratios with flexible tolerance:
+        // XAB = 0.786 (between 0.618 and 1.0)
         // ABC = 0.382 - 0.886
         // BCD = 1.618 - 2.24
         // XAD = 1.27 - 1.618
 
-        is_butterfly = f_within_tolerance(xab, FIB_0786, fib_tolerance) and
-                       (abc >= FIB_0382 - fib_tolerance and abc <= FIB_0886 + fib_tolerance) and
-                       (bcd >= FIB_1618 - fib_tolerance and bcd <= FIB_2240 + fib_tolerance) and
-                       (xad >= FIB_1272 - fib_tolerance and xad <= FIB_1618 + fib_tolerance)
+        xab_match = f_within_flexible_tolerance(xab, FIB_0786, FIB_0618, FIB_1000)
+
+        abc_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
+        abc_max_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
+        abc_match = (abc >= FIB_0382 - abc_min_tol and abc <= FIB_0886 + abc_max_tol)
+
+        bcd_min_tol = f_flexible_tolerance(FIB_1618, FIB_1414, FIB_2000)
+        bcd_max_tol = f_flexible_tolerance(FIB_2240, FIB_2000, FIB_2618)
+        bcd_match = (bcd >= FIB_1618 - bcd_min_tol and bcd <= FIB_2240 + bcd_max_tol)
+
+        xad_min_tol = f_flexible_tolerance(FIB_1272, FIB_1130, FIB_1414)
+        xad_max_tol = f_flexible_tolerance(FIB_1618, FIB_1414, FIB_2000)
+        xad_match = (xad >= FIB_1272 - xad_min_tol and xad <= FIB_1618 + xad_max_tol)
+
+        is_butterfly = xab_match and abc_match and bcd_match and xad_match
 
         is_potential = (not is_butterfly) and show_potential and
-                       f_within_tolerance(xab, FIB_0786, fib_tolerance * 1.5)
+                       f_within_tolerance(xab, FIB_0786, fib_tolerance_max * 1.2)
 
         if is_butterfly or is_potential
             line_style = is_butterfly ? line.style_solid : line.style_dashed
@@ -568,19 +975,30 @@ f_detect_bat() =>
         bcd = f_retracement(b, c, d)
         xad = f_retracement(x, a, d)
 
-        // Bat ratios:
+        // Bat ratios with flexible tolerance:
         // XAB = 0.382 - 0.50
         // ABC = 0.382 - 0.886
         // BCD = 1.618 - 2.618
         // XAD = 0.886
 
-        is_bat = (xab >= FIB_0382 - fib_tolerance and xab <= FIB_0500 + fib_tolerance) and
-                 (abc >= FIB_0382 - fib_tolerance and abc <= FIB_0886 + fib_tolerance) and
-                 (bcd >= FIB_1618 - fib_tolerance and bcd <= FIB_2618 + fib_tolerance) and
-                 f_within_tolerance(xad, FIB_0886, fib_tolerance)
+        xab_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
+        xab_max_tol = f_flexible_tolerance(FIB_0500, FIB_0382, FIB_0618)
+        xab_match = (xab >= FIB_0382 - xab_min_tol and xab <= FIB_0500 + xab_max_tol)
+
+        abc_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
+        abc_max_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
+        abc_match = (abc >= FIB_0382 - abc_min_tol and abc <= FIB_0886 + abc_max_tol)
+
+        bcd_min_tol = f_flexible_tolerance(FIB_1618, FIB_1414, FIB_2000)
+        bcd_max_tol = f_flexible_tolerance(FIB_2618, FIB_2240, FIB_3000)
+        bcd_match = (bcd >= FIB_1618 - bcd_min_tol and bcd <= FIB_2618 + bcd_max_tol)
+
+        xad_match = f_within_flexible_tolerance(xad, FIB_0886, FIB_0786, FIB_1000)
+
+        is_bat = xab_match and abc_match and bcd_match and xad_match
 
         is_potential = (not is_bat) and show_potential and
-                       (xab >= FIB_0382 - fib_tolerance * 1.5 and xab <= FIB_0500 + fib_tolerance * 1.5)
+                       (xab >= FIB_0382 - fib_tolerance_max * 1.2 and xab <= FIB_0500 + fib_tolerance_max * 1.2)
 
         if is_bat or is_potential
             line_style = is_bat ? line.style_solid : line.style_dashed
@@ -623,22 +1041,37 @@ f_detect_crab() =>
         bcd = f_extension(b, c, d)
         xad = f_extension(x, a, d)
 
-        // Crab ratios:
+        // Crab ratios with flexible tolerance:
         // XAB = 0.382 - 0.618
         // ABC = 0.382 - 0.886
         // BCD = 2.24 - 3.618
         // XAD = 1.618
 
-        is_crab = (xab >= FIB_0382 - fib_tolerance and xab <= FIB_0618 + fib_tolerance) and
-                  (abc >= FIB_0382 - fib_tolerance and abc <= FIB_0886 + fib_tolerance) and
-                  (bcd >= FIB_2240 - fib_tolerance) and
-                  f_within_tolerance(xad, FIB_1618, fib_tolerance)
+        xab_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
+        xab_max_tol = f_flexible_tolerance(FIB_0618, FIB_0500, FIB_0786)
+        xab_match = (xab >= FIB_0382 - xab_min_tol and xab <= FIB_0618 + xab_max_tol)
 
-        if is_crab
-            line.new(bx, x, ba, a, color=color_harmonic, width=2)
-            line.new(ba, a, bb, b, color=color_harmonic, width=2)
-            line.new(bb, b, bc, c, color=color_harmonic, width=2)
-            line.new(bc, c, bd, d, color=color_harmonic, width=2)
+        abc_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
+        abc_max_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
+        abc_match = (abc >= FIB_0382 - abc_min_tol and abc <= FIB_0886 + abc_max_tol)
+
+        bcd_min_tol = f_flexible_tolerance(FIB_2240, FIB_2000, FIB_2618)
+        bcd_match = (bcd >= FIB_2240 - bcd_min_tol)
+
+        xad_match = f_within_flexible_tolerance(xad, FIB_1618, FIB_1414, FIB_2000)
+
+        is_crab = xab_match and abc_match and bcd_match and xad_match
+
+        is_potential = (not is_crab) and show_potential and
+                       f_within_tolerance(xad, FIB_1618, fib_tolerance_max * 1.2)
+
+        if is_crab or is_potential
+            line_style = is_crab ? line.style_solid : line.style_dashed
+            pattern_label = is_crab ? "Crab" : "Potential Crab"
+            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
 
             is_bullish = a > x
 
@@ -671,20 +1104,35 @@ f_detect_shark() =>
         abc = f_retracement(a, b, c)
         xad = f_extension(x, a, d)
 
-        // Shark ratios:
+        // Shark ratios with flexible tolerance:
         // XAB = 0.382 - 0.618
         // ABC = 1.13 - 1.618
         // XAD = 0.886 - 1.13
 
-        is_shark = (xab >= FIB_0382 - fib_tolerance and xab <= FIB_0618 + fib_tolerance) and
-                   (abc >= FIB_1130 - fib_tolerance and abc <= FIB_1618 + fib_tolerance) and
-                   (xad >= FIB_0886 - fib_tolerance and xad <= FIB_1130 + fib_tolerance)
+        xab_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
+        xab_max_tol = f_flexible_tolerance(FIB_0618, FIB_0500, FIB_0786)
+        xab_match = (xab >= FIB_0382 - xab_min_tol and xab <= FIB_0618 + xab_max_tol)
 
-        if is_shark
-            line.new(bx, x, ba, a, color=color_harmonic, width=2)
-            line.new(ba, a, bb, b, color=color_harmonic, width=2)
-            line.new(bb, b, bc, c, color=color_harmonic, width=2)
-            line.new(bc, c, bd, d, color=color_harmonic, width=2)
+        abc_min_tol = f_flexible_tolerance(FIB_1130, FIB_1000, FIB_1272)
+        abc_max_tol = f_flexible_tolerance(FIB_1618, FIB_1414, FIB_2000)
+        abc_match = (abc >= FIB_1130 - abc_min_tol and abc <= FIB_1618 + abc_max_tol)
+
+        xad_min_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
+        xad_max_tol = f_flexible_tolerance(FIB_1130, FIB_1000, FIB_1272)
+        xad_match = (xad >= FIB_0886 - xad_min_tol and xad <= FIB_1130 + xad_max_tol)
+
+        is_shark = xab_match and abc_match and xad_match
+
+        is_potential = (not is_shark) and show_potential and
+                       (xab >= FIB_0382 - fib_tolerance_max * 1.2 and xab <= FIB_0618 + fib_tolerance_max * 1.2)
+
+        if is_shark or is_potential
+            line_style = is_shark ? line.style_solid : line.style_dashed
+            pattern_label = is_shark ? "Shark" : "Potential Shark"
+            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
 
             is_bullish = a > x
 
@@ -694,7 +1142,7 @@ f_detect_shark() =>
             label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
             label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), "Shark", style=label.style_none, textcolor=color_harmonic, size=size.normal)
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
 
 // Detect Cypher Pattern
 f_detect_cypher() =>
@@ -717,20 +1165,33 @@ f_detect_cypher() =>
         axc = f_extension(a, x, c)
         xcd = f_retracement(x, c, d)
 
-        // Cypher ratios:
+        // Cypher ratios with flexible tolerance:
         // XAB = 0.382 - 0.618
         // AXC = 1.13 - 1.414
         // XCD = 0.786
 
-        is_cypher = (xab >= FIB_0382 - fib_tolerance and xab <= FIB_0618 + fib_tolerance) and
-                    (axc >= FIB_1130 - fib_tolerance and axc <= FIB_1414 + fib_tolerance) and
-                    f_within_tolerance(xcd, FIB_0786, fib_tolerance)
+        xab_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
+        xab_max_tol = f_flexible_tolerance(FIB_0618, FIB_0500, FIB_0786)
+        xab_match = (xab >= FIB_0382 - xab_min_tol and xab <= FIB_0618 + xab_max_tol)
 
-        if is_cypher
-            line.new(bx, x, ba, a, color=color_harmonic, width=2)
-            line.new(ba, a, bb, b, color=color_harmonic, width=2)
-            line.new(bb, b, bc, c, color=color_harmonic, width=2)
-            line.new(bc, c, bd, d, color=color_harmonic, width=2)
+        axc_min_tol = f_flexible_tolerance(FIB_1130, FIB_1000, FIB_1272)
+        axc_max_tol = f_flexible_tolerance(FIB_1414, FIB_1272, FIB_1618)
+        axc_match = (axc >= FIB_1130 - axc_min_tol and axc <= FIB_1414 + axc_max_tol)
+
+        xcd_match = f_within_flexible_tolerance(xcd, FIB_0786, FIB_0618, FIB_0886)
+
+        is_cypher = xab_match and axc_match and xcd_match
+
+        is_potential = (not is_cypher) and show_potential and
+                       f_within_tolerance(xcd, FIB_0786, fib_tolerance_max * 1.2)
+
+        if is_cypher or is_potential
+            line_style = is_cypher ? line.style_solid : line.style_dashed
+            pattern_label = is_cypher ? "Cypher" : "Potential Cypher"
+            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
 
             is_bullish = a > x
 
@@ -740,7 +1201,7 @@ f_detect_cypher() =>
             label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
             label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), "Cypher", style=label.style_none, textcolor=color_harmonic, size=size.normal)
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VII. WYCKOFF PATTERN DETECTION (와이코프 패턴 탐지)
@@ -878,7 +1339,9 @@ f_detect_master_pattern() =>
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Detect Kondratiev Wave Cycle (Long-term economic cycles: 40-60 years in real economy, adapted for chart timeframes)
+// Returns the background color for the current phase
 f_detect_kondratiev_wave() =>
+    var color bg_color = na
     if show_kondratiev
         // Use very long-term moving averages to identify major cycles
         lookback = kondratiev_lookback
@@ -908,15 +1371,19 @@ f_detect_kondratiev_wave() =>
         if cycle_position < 0.25 and roc_long > 0
             kondratiev_phase := "Spring (Recovery)"
             phase_color := color.new(color.green, 70)
+            bg_color := color.new(color.green, 95)  // Subtle green tint for Spring
         else if cycle_position >= 0.25 and cycle_position < 0.60 and roc_medium > 0
             kondratiev_phase := "Summer (Prosperity)"
             phase_color := color.new(color.yellow, 70)
+            bg_color := color.new(color.yellow, 95)  // Subtle yellow tint for Summer
         else if cycle_position >= 0.60 and roc_long < 0
             kondratiev_phase := "Autumn (Recession)"
             phase_color := color.new(color.orange, 70)
+            bg_color := color.new(color.orange, 95)  // Subtle orange tint for Autumn
         else if cycle_position < 0.25 and roc_long < 0
             kondratiev_phase := "Winter (Depression)"
             phase_color := color.new(color.blue, 70)
+            bg_color := color.new(color.blue, 96)  // Subtle blue tint for Winter
 
         // Display Kondratiev Wave information
         if barstate.islast
@@ -937,6 +1404,8 @@ f_detect_kondratiev_wave() =>
         else if last_phase != kondratiev_phase
             label.new(bar_index, high, kondratiev_phase, style=label.style_label_down, color=phase_color, textcolor=color.white, size=size.small, tooltip="Kondratiev Wave Phase Transition")
             last_phase := kondratiev_phase
+
+    bg_color  // Return background color for seasonal tinting
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // XI. DEEP DEPTH CYCLE DETECTION (심층 사이클 탐지)
@@ -1066,32 +1535,68 @@ f_detect_livermore_cylinder() =>
                 breakout_up = close > cylinder_high
                 breakout_down = close < cylinder_low
 
+                // Volume confirmation for breakout
+                current_volume = volume
+                avg_volume_20 = ta.sma(volume, 20)
+                is_volume_confirmed = current_volume > avg_volume_20 * cylinder_breakout_volume_mult
+
+                // Calculate volume ratio for tooltip
+                volume_ratio = avg_volume_20 > 0 ? current_volume / avg_volume_20 : 0
+
                 if breakout_up
-                    // Bullish breakout
-                    label.new(bar_index, low, "Cylinder\nBreakout ▲",
-                             style=label.style_label_up,
-                             color=color.new(color.green, 0),
-                             textcolor=color.white,
-                             size=size.normal,
-                             tooltip="Livermore Cylinder Bullish Breakout - Strong Upward Move Expected")
-                    // Draw arrow showing breakout
-                    line.new(bar_index - 1, cylinder_high, bar_index + 5, cylinder_high + (cylinder_high - cylinder_low),
-                            color=color.new(color.green, 30),
-                            width=2,
-                            style=line.style_arrow_right)
+                    if is_volume_confirmed
+                        // Confirmed bullish breakout with volume
+                        label.new(bar_index, low, "Livermore Breakout ▲\nVol: " + str.tostring(volume_ratio, "#.#") + "x",
+                                 style=label.style_label_up,
+                                 color=color.new(color.green, 0),
+                                 textcolor=color.white,
+                                 size=size.normal,
+                                 tooltip="Livermore Cylinder CONFIRMED Bullish Breakout\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nStrong upward move expected")
+                        // Draw strong arrow for confirmed breakout
+                        line.new(bar_index - 1, cylinder_high, bar_index + 5, cylinder_high + (cylinder_high - cylinder_low),
+                                color=color.new(color.green, 0),
+                                width=3,
+                                style=line.style_arrow_right)
+                    else
+                        // Weak breakout without volume confirmation
+                        label.new(bar_index, low, "Weak Breakout ▲",
+                                 style=label.style_label_up,
+                                 color=color.new(color.green, 50),
+                                 textcolor=color.white,
+                                 size=size.small,
+                                 tooltip="Cylinder breakout without volume confirmation\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nMay fail - use caution")
+                        // Draw dashed arrow for weak breakout
+                        line.new(bar_index - 1, cylinder_high, bar_index + 5, cylinder_high + (cylinder_high - cylinder_low) * 0.5,
+                                color=color.new(color.green, 50),
+                                width=1,
+                                style=line.style_dashed)
                 else if breakout_down
-                    // Bearish breakout
-                    label.new(bar_index, high, "Cylinder\nBreakout ▼",
-                             style=label.style_label_down,
-                             color=color.new(color.red, 0),
-                             textcolor=color.white,
-                             size=size.normal,
-                             tooltip="Livermore Cylinder Bearish Breakout - Strong Downward Move Expected")
-                    // Draw arrow showing breakout
-                    line.new(bar_index - 1, cylinder_low, bar_index + 5, cylinder_low - (cylinder_high - cylinder_low),
-                            color=color.new(color.red, 30),
-                            width=2,
-                            style=line.style_arrow_right)
+                    if is_volume_confirmed
+                        // Confirmed bearish breakout with volume
+                        label.new(bar_index, high, "Livermore Breakout ▼\nVol: " + str.tostring(volume_ratio, "#.#") + "x",
+                                 style=label.style_label_down,
+                                 color=color.new(color.red, 0),
+                                 textcolor=color.white,
+                                 size=size.normal,
+                                 tooltip="Livermore Cylinder CONFIRMED Bearish Breakout\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nStrong downward move expected")
+                        // Draw strong arrow for confirmed breakout
+                        line.new(bar_index - 1, cylinder_low, bar_index + 5, cylinder_low - (cylinder_high - cylinder_low),
+                                color=color.new(color.red, 0),
+                                width=3,
+                                style=line.style_arrow_right)
+                    else
+                        // Weak breakout without volume confirmation
+                        label.new(bar_index, high, "Weak Breakout ▼",
+                                 style=label.style_label_down,
+                                 color=color.new(color.red, 50),
+                                 textcolor=color.white,
+                                 size=size.small,
+                                 tooltip="Cylinder breakout without volume confirmation\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nMay fail - use caution")
+                        // Draw dashed arrow for weak breakout
+                        line.new(bar_index - 1, cylinder_low, bar_index + 5, cylinder_low - (cylinder_high - cylinder_low) * 0.5,
+                                color=color.new(color.red, 50),
+                                width=1,
+                                style=line.style_dashed)
 
             // Reset cylinder tracking
             cylinder_start := na
@@ -1478,6 +1983,12 @@ if barstate.islast or barstate.isrealtime
     f_detect_connecting_wave_wxy()
     f_detect_triangle_wave()
 
+    // Fractal Elliott Wave (Dual ZigZag - Major/Minor)
+    f_detect_major_impulse()
+    f_detect_major_corrective()
+    f_detect_minor_impulse()
+    f_detect_minor_corrective()
+
     // NEoWave Advanced Patterns (Glenn Neely)
     f_detect_diametric_formation()
     f_detect_extracting_triangle()
@@ -1505,7 +2016,11 @@ f_detect_dow_theory()
 f_detect_master_pattern()
 
 // Kondratiev Wave (runs on every bar for phase detection)
-f_detect_kondratiev_wave()
+kondratiev_bg_color = f_detect_kondratiev_wave()
+
+// Apply Kondratiev seasonal background tinting
+if kondratiev_show_background and not na(kondratiev_bg_color)
+    bgcolor(kondratiev_bg_color, title="Kondratiev Seasonal Background")
 
 // Deep Depth Cycle (runs on every bar for cycle analysis)
 f_detect_deep_depth_cycle()
