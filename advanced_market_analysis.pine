@@ -326,6 +326,16 @@ if not na(minor_pl)
 // III-C. FRACTAL WAVE LABELING (프랙탈 파동 라벨링 - 계층적 구조)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Persistent storage for live updates (라이브 업데이트용 저장소)
+var label[] major_impulse_labels = array.new<label>(5)
+var line[] major_impulse_lines = array.new<line>(5)
+var label[] major_corrective_labels = array.new<label>(3)
+var line[] major_corrective_lines = array.new<line>(3)
+var label[] minor_impulse_labels = array.new<label>(5)
+var line[] minor_impulse_lines = array.new<line>(5)
+var label[] minor_corrective_labels = array.new<label>(3)
+var line[] minor_corrective_lines = array.new<line>(3)
+
 // Detect Major Impulse Waves (대파동 임펄스: 1, 2, 3, 4, 5)
 f_detect_major_impulse() =>
     if array.size(major_zz_price) >= 6 and show_fractal_elliott and show_major_waves
@@ -362,30 +372,37 @@ f_detect_major_impulse() =>
         valid_wave4 = is_bullish ? (p4 > p1) : (p4 < p1)  // Wave 4 no overlap
 
         if valid_wave2 and valid_wave3 and valid_wave4
-            // Draw major impulse lines (bold)
-            line.new(b0, p0, b1, p1, color=color_impulse, width=3)
-            line.new(b1, p1, b2, p2, color=color_impulse, width=3)
-            line.new(b2, p2, b3, p3, color=color_impulse, width=3)
-            line.new(b3, p3, b4, p4, color=color_impulse, width=3)
-            line.new(b4, p4, b5, p5, color=color_impulse, width=3)
+            // Delete old lines/labels for live update
+            for i = 0 to 4
+                if not na(array.get(major_impulse_lines, i))
+                    line.delete(array.get(major_impulse_lines, i))
+                if not na(array.get(major_impulse_labels, i))
+                    label.delete(array.get(major_impulse_labels, i))
+
+            // Draw major impulse lines (bold, last wave is dashed for live update)
+            array.set(major_impulse_lines, 0, line.new(b0, p0, b1, p1, color=color_impulse, width=3, style=line.style_solid))
+            array.set(major_impulse_lines, 1, line.new(b1, p1, b2, p2, color=color_impulse, width=3, style=line.style_solid))
+            array.set(major_impulse_lines, 2, line.new(b2, p2, b3, p3, color=color_impulse, width=3, style=line.style_solid))
+            array.set(major_impulse_lines, 3, line.new(b3, p3, b4, p4, color=color_impulse, width=3, style=line.style_solid))
+            array.set(major_impulse_lines, 4, line.new(b4, p4, b5, p5, color=color_impulse, width=3, style=line.style_dashed))  // Last wave: dashed
 
             // Major wave labels (bold Arabic numerals, far from candles)
             label_offset_major = atr_value * label_offset_multiplier * 3.0
-            label.new(b1, is_bullish ? p1 - label_offset_major : p1 + label_offset_major,
+            array.set(major_impulse_labels, 0, label.new(b1, is_bullish ? p1 - label_offset_major : p1 + label_offset_major,
                      "1", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.large, textalign=text.align_center)
-            label.new(b2, is_bullish ? p2 + label_offset_major : p2 - label_offset_major,
+                     textcolor=color_impulse, size=size.large, textalign=text.align_center))
+            array.set(major_impulse_labels, 1, label.new(b2, is_bullish ? p2 + label_offset_major : p2 - label_offset_major,
                      "2", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.large, textalign=text.align_center)
-            label.new(b3, is_bullish ? p3 - label_offset_major : p3 + label_offset_major,
+                     textcolor=color_impulse, size=size.large, textalign=text.align_center))
+            array.set(major_impulse_labels, 2, label.new(b3, is_bullish ? p3 - label_offset_major : p3 + label_offset_major,
                      "3", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.large, textalign=text.align_center)
-            label.new(b4, is_bullish ? p4 + label_offset_major : p4 - label_offset_major,
+                     textcolor=color_impulse, size=size.large, textalign=text.align_center))
+            array.set(major_impulse_labels, 3, label.new(b4, is_bullish ? p4 + label_offset_major : p4 - label_offset_major,
                      "4", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.large, textalign=text.align_center)
-            label.new(b5, is_bullish ? p5 - label_offset_major : p5 + label_offset_major,
-                     "5", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.large, textalign=text.align_center)
+                     textcolor=color_impulse, size=size.large, textalign=text.align_center))
+            array.set(major_impulse_labels, 4, label.new(b5, is_bullish ? p5 - label_offset_major : p5 + label_offset_major,
+                     "5?", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color.new(color_impulse, 50), size=size.large, textalign=text.align_center))  // "5?" for uncertain last wave
 
 // Detect Major Corrective Waves (대파동 조정: A, B, C)
 f_detect_major_corrective() =>
@@ -415,22 +432,29 @@ f_detect_major_corrective() =>
         valid_abc = retrace_b > 0.236 and retrace_b < 1.0  // B retraces 23.6%-100% of A
 
         if valid_abc
-            // Draw major corrective lines
-            line.new(b0, p0, b1, p1, color=color_corrective, width=3)
-            line.new(b1, p1, b2, p2, color=color_corrective, width=3)
-            line.new(b2, p2, b3, p3, color=color_corrective, width=3)
+            // Delete old lines/labels for live update
+            for i = 0 to 2
+                if not na(array.get(major_corrective_lines, i))
+                    line.delete(array.get(major_corrective_lines, i))
+                if not na(array.get(major_corrective_labels, i))
+                    label.delete(array.get(major_corrective_labels, i))
+
+            // Draw major corrective lines (last wave C is dashed for live update)
+            array.set(major_corrective_lines, 0, line.new(b0, p0, b1, p1, color=color_corrective, width=3, style=line.style_solid))
+            array.set(major_corrective_lines, 1, line.new(b1, p1, b2, p2, color=color_corrective, width=3, style=line.style_solid))
+            array.set(major_corrective_lines, 2, line.new(b2, p2, b3, p3, color=color_corrective, width=3, style=line.style_dashed))  // Last wave: dashed
 
             // Major corrective labels (bold uppercase, far from candles)
             label_offset_major = atr_value * label_offset_multiplier * 3.0
-            label.new(b1, is_bullish ? p1 + label_offset_major : p1 - label_offset_major,
+            array.set(major_corrective_labels, 0, label.new(b1, is_bullish ? p1 + label_offset_major : p1 - label_offset_major,
                      "A", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_corrective, size=size.large, textalign=text.align_center)
-            label.new(b2, is_bullish ? p2 - label_offset_major : p2 + label_offset_major,
+                     textcolor=color_corrective, size=size.large, textalign=text.align_center))
+            array.set(major_corrective_labels, 1, label.new(b2, is_bullish ? p2 - label_offset_major : p2 + label_offset_major,
                      "B", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_corrective, size=size.large, textalign=text.align_center)
-            label.new(b3, is_bullish ? p3 + label_offset_major : p3 - label_offset_major,
-                     "C", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_corrective, size=size.large, textalign=text.align_center)
+                     textcolor=color_corrective, size=size.large, textalign=text.align_center))
+            array.set(major_corrective_labels, 2, label.new(b3, is_bullish ? p3 + label_offset_major : p3 - label_offset_major,
+                     "C?", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color.new(color_corrective, 50), size=size.large, textalign=text.align_center))  // "C?" for uncertain last wave
 
 // Detect Minor Impulse Waves (소파동 임펄스: i, ii, iii, iv, v)
 f_detect_minor_impulse() =>
@@ -468,30 +492,37 @@ f_detect_minor_impulse() =>
         valid_wave4 = is_bullish ? (p4 > p1) : (p4 < p1)
 
         if valid_wave2 and valid_wave3 and valid_wave4
-            // Draw minor impulse lines (thin)
-            line.new(b0, p0, b1, p1, color=color_impulse, width=1, style=line.style_dotted)
-            line.new(b1, p1, b2, p2, color=color_impulse, width=1, style=line.style_dotted)
-            line.new(b2, p2, b3, p3, color=color_impulse, width=1, style=line.style_dotted)
-            line.new(b3, p3, b4, p4, color=color_impulse, width=1, style=line.style_dotted)
-            line.new(b4, p4, b5, p5, color=color_impulse, width=1, style=line.style_dotted)
+            // Delete old lines/labels for live update
+            for i = 0 to 4
+                if not na(array.get(minor_impulse_lines, i))
+                    line.delete(array.get(minor_impulse_lines, i))
+                if not na(array.get(minor_impulse_labels, i))
+                    label.delete(array.get(minor_impulse_labels, i))
+
+            // Draw minor impulse lines (thin, last wave is dashed for live update)
+            array.set(minor_impulse_lines, 0, line.new(b0, p0, b1, p1, color=color_impulse, width=1, style=line.style_dotted))
+            array.set(minor_impulse_lines, 1, line.new(b1, p1, b2, p2, color=color_impulse, width=1, style=line.style_dotted))
+            array.set(minor_impulse_lines, 2, line.new(b2, p2, b3, p3, color=color_impulse, width=1, style=line.style_dotted))
+            array.set(minor_impulse_lines, 3, line.new(b3, p3, b4, p4, color=color_impulse, width=1, style=line.style_dotted))
+            array.set(minor_impulse_lines, 4, line.new(b4, p4, b5, p5, color=color_impulse, width=1, style=line.style_dashed))  // Last wave: more dashed
 
             // Minor wave labels (lowercase Roman numerals, close to candles)
             label_offset_minor = atr_value * label_offset_multiplier * 0.5
-            label.new(b1, is_bullish ? p1 - label_offset_minor : p1 + label_offset_minor,
+            array.set(minor_impulse_labels, 0, label.new(b1, is_bullish ? p1 - label_offset_minor : p1 + label_offset_minor,
                      "i", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center)
-            label.new(b2, is_bullish ? p2 + label_offset_minor : p2 - label_offset_minor,
+                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center))
+            array.set(minor_impulse_labels, 1, label.new(b2, is_bullish ? p2 + label_offset_minor : p2 - label_offset_minor,
                      "ii", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center)
-            label.new(b3, is_bullish ? p3 - label_offset_minor : p3 + label_offset_minor,
+                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center))
+            array.set(minor_impulse_labels, 2, label.new(b3, is_bullish ? p3 - label_offset_minor : p3 + label_offset_minor,
                      "iii", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center)
-            label.new(b4, is_bullish ? p4 + label_offset_minor : p4 - label_offset_minor,
+                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center))
+            array.set(minor_impulse_labels, 3, label.new(b4, is_bullish ? p4 + label_offset_minor : p4 - label_offset_minor,
                      "iv", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center)
-            label.new(b5, is_bullish ? p5 - label_offset_minor : p5 + label_offset_minor,
-                     "v", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center)
+                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center))
+            array.set(minor_impulse_labels, 4, label.new(b5, is_bullish ? p5 - label_offset_minor : p5 + label_offset_minor,
+                     "v?", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color.new(color_impulse, 50), size=size.tiny, textalign=text.align_center))  // "v?" for uncertain last wave
 
 // Detect Minor Corrective Waves (소파동 조정: a, b, c)
 f_detect_minor_corrective() =>
@@ -521,22 +552,29 @@ f_detect_minor_corrective() =>
         valid_abc = retrace_b > 0.236 and retrace_b < 1.0
 
         if valid_abc
-            // Draw minor corrective lines
-            line.new(b0, p0, b1, p1, color=color_corrective, width=1, style=line.style_dotted)
-            line.new(b1, p1, b2, p2, color=color_corrective, width=1, style=line.style_dotted)
-            line.new(b2, p2, b3, p3, color=color_corrective, width=1, style=line.style_dotted)
+            // Delete old lines/labels for live update
+            for i = 0 to 2
+                if not na(array.get(minor_corrective_lines, i))
+                    line.delete(array.get(minor_corrective_lines, i))
+                if not na(array.get(minor_corrective_labels, i))
+                    label.delete(array.get(minor_corrective_labels, i))
+
+            // Draw minor corrective lines (last wave c is dashed for live update)
+            array.set(minor_corrective_lines, 0, line.new(b0, p0, b1, p1, color=color_corrective, width=1, style=line.style_dotted))
+            array.set(minor_corrective_lines, 1, line.new(b1, p1, b2, p2, color=color_corrective, width=1, style=line.style_dotted))
+            array.set(minor_corrective_lines, 2, line.new(b2, p2, b3, p3, color=color_corrective, width=1, style=line.style_dashed))  // Last wave: more dashed
 
             // Minor corrective labels (lowercase letters, close to candles)
             label_offset_minor = atr_value * label_offset_multiplier * 0.5
-            label.new(b1, is_bullish ? p1 + label_offset_minor : p1 - label_offset_minor,
+            array.set(minor_corrective_labels, 0, label.new(b1, is_bullish ? p1 + label_offset_minor : p1 - label_offset_minor,
                      "a", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_corrective, size=size.tiny, textalign=text.align_center)
-            label.new(b2, is_bullish ? p2 - label_offset_minor : p2 + label_offset_minor,
+                     textcolor=color_corrective, size=size.tiny, textalign=text.align_center))
+            array.set(minor_corrective_labels, 1, label.new(b2, is_bullish ? p2 - label_offset_minor : p2 + label_offset_minor,
                      "b", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_corrective, size=size.tiny, textalign=text.align_center)
-            label.new(b3, is_bullish ? p3 + label_offset_minor : p3 - label_offset_minor,
-                     "c", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_corrective, size=size.tiny, textalign=text.align_center)
+                     textcolor=color_corrective, size=size.tiny, textalign=text.align_center))
+            array.set(minor_corrective_labels, 2, label.new(b3, is_bullish ? p3 + label_offset_minor : p3 - label_offset_minor,
+                     "c?", style=label.style_none, color=color.new(color.white, 100),
+                     textcolor=color.new(color_corrective, 50), size=size.tiny, textalign=text.align_center))  // "c?" for uncertain last wave
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // IV. HELPER FUNCTIONS (헬퍼 함수)
