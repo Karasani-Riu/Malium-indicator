@@ -631,8 +631,14 @@ f_label_offset(is_bullish, multiplier=1.0) =>
     is_bullish ? offset : -offset
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// V. ELLIOTT WAVE DETECTION (엘리엇 파동 탐지)
+// V. ELLIOTT WAVE DETECTION (엘리엇 파동 탐지 - Legacy ZigZag)
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// Persistent storage for live updates (라이브 업데이트용 저장소)
+var label[] legacy_impulse_labels = array.new<label>(5)
+var line[] legacy_impulse_lines = array.new<line>(5)
+var label[] legacy_corrective_labels = array.new<label>(3)
+var line[] legacy_corrective_lines = array.new<line>(3)
 
 // Detect Impulse Waves (1, 2, 3, 4, 5)
 f_detect_impulse_wave() =>
@@ -687,31 +693,38 @@ f_detect_impulse_wave() =>
         is_diagonal = not (wave3 > wave1 and wave3 > wave5)
 
         if valid_wave2 and valid_wave3 and valid_wave4
-            // Draw impulse wave lines
-            line.new(b0, p0, b1, p1, color=color_impulse, width=2)
-            line.new(b1, p1, b2, p2, color=color_impulse, width=2)
-            line.new(b2, p2, b3, p3, color=color_impulse, width=2)
-            line.new(b3, p3, b4, p4, color=color_impulse, width=2)
-            line.new(b4, p4, b5, p5, color=color_impulse, width=2)
+            // Delete old lines/labels for live update
+            for i = 0 to 4
+                if not na(array.get(legacy_impulse_lines, i))
+                    line.delete(array.get(legacy_impulse_lines, i))
+                if not na(array.get(legacy_impulse_labels, i))
+                    label.delete(array.get(legacy_impulse_labels, i))
+
+            // Draw impulse wave lines (last wave dashed)
+            array.set(legacy_impulse_lines, 0, line.new(b0, p0, b1, p1, color=color_impulse, width=2, style=line.style_solid))
+            array.set(legacy_impulse_lines, 1, line.new(b1, p1, b2, p2, color=color_impulse, width=2, style=line.style_solid))
+            array.set(legacy_impulse_lines, 2, line.new(b2, p2, b3, p3, color=color_impulse, width=2, style=line.style_solid))
+            array.set(legacy_impulse_lines, 3, line.new(b3, p3, b4, p4, color=color_impulse, width=2, style=line.style_solid))
+            array.set(legacy_impulse_lines, 4, line.new(b4, p4, b5, p5, color=color_impulse, width=2, style=line.style_dashed))  // Last wave dashed
 
             // Place labels
-            label.new(b1, p1, "①", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse, textcolor=color.white, size=size.normal)
-            label.new(b2, p2, "②", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_impulse, textcolor=color.white, size=size.normal)
-            label.new(b3, p3, "③", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse, textcolor=color.white, size=size.normal)
-            label.new(b4, p4, "④", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_impulse, textcolor=color.white, size=size.normal)
+            array.set(legacy_impulse_labels, 0, label.new(b1, p1, "①", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse, textcolor=color.white, size=size.normal))
+            array.set(legacy_impulse_labels, 1, label.new(b2, p2, "②", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_impulse, textcolor=color.white, size=size.normal))
+            array.set(legacy_impulse_labels, 2, label.new(b3, p3, "③", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse, textcolor=color.white, size=size.normal))
+            array.set(legacy_impulse_labels, 3, label.new(b4, p4, "④", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_impulse, textcolor=color.white, size=size.normal))
 
-            // Label wave 5 (or 5T if truncated)
+            // Label wave 5 (or 5T if truncated) - uncertain with ?
             if is_truncated and show_truncated
-                label.new(b5, p5, "⑤T", style=is_bullish ? label.style_label_up : label.style_label_down, color=color.new(color_impulse, 0), textcolor=color.white, size=size.normal)
+                array.set(legacy_impulse_labels, 4, label.new(b5, p5, "⑤T?", style=is_bullish ? label.style_label_up : label.style_label_down, color=color.new(color_impulse, 30), textcolor=color.white, size=size.normal))
                 // Add truncation annotation
                 line.new(b3, p3, b5, p5, color=color_impulse, width=1, style=line.style_dashed)
-                label.new(b5, p5 + (is_bullish ? atr_value : -atr_value), "Truncated 5", style=label.style_none, color=color.new(color.white, 100), textcolor=color_impulse, size=size.small)
+                label.new(b5, p5 + (is_bullish ? atr_value : -atr_value), "Truncated 5?", style=label.style_none, color=color.new(color.white, 100), textcolor=color.new(color_impulse, 50), size=size.small)
             else
-                label.new(b5, p5, "⑤", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse, textcolor=color.white, size=size.normal)
+                array.set(legacy_impulse_labels, 4, label.new(b5, p5, "⑤?", style=is_bullish ? label.style_label_up : label.style_label_down, color=color.new(color_impulse, 30), textcolor=color.white, size=size.normal))
 
             // Check and label diagonal
             if is_diagonal and show_diagonal
-                label.new(b3, p3 + (is_bullish ? atr_value * 2 : -atr_value * 2), "Diagonal", style=label.style_none, color=color.new(color.white, 100), textcolor=color_impulse, size=size.small)
+                label.new(b3, p3 + (is_bullish ? atr_value * 2 : -atr_value * 2), "Diagonal?", style=label.style_none, color=color.new(color.white, 100), textcolor=color.new(color_impulse, 50), size=size.small)
 
 // Detect Corrective Waves (ABC)
 f_detect_corrective_wave() =>
@@ -739,19 +752,22 @@ f_detect_corrective_wave() =>
 
         // Basic ABC validation
         if waveA > 0 and waveB > 0 and waveC > 0
-            // Determine if pattern is completed (solid) or in progress (dashed)
-            is_completed = bar_index - b3 > zigzag_depth * 2
-            line_style = is_completed ? line.style_solid : line.style_dashed
+            // Delete old lines/labels for live update
+            for i = 0 to 2
+                if not na(array.get(legacy_corrective_lines, i))
+                    line.delete(array.get(legacy_corrective_lines, i))
+                if not na(array.get(legacy_corrective_labels, i))
+                    label.delete(array.get(legacy_corrective_labels, i))
 
-            // Draw corrective wave lines
-            line.new(b0, p0, b1, p1, color=color_corrective, width=2, style=line_style)
-            line.new(b1, p1, b2, p2, color=color_corrective, width=2, style=line_style)
-            line.new(b2, p2, b3, p3, color=color_corrective, width=2, style=line_style)
+            // Draw corrective wave lines (last wave C is dashed)
+            array.set(legacy_corrective_lines, 0, line.new(b0, p0, b1, p1, color=color_corrective, width=2, style=line.style_solid))
+            array.set(legacy_corrective_lines, 1, line.new(b1, p1, b2, p2, color=color_corrective, width=2, style=line.style_solid))
+            array.set(legacy_corrective_lines, 2, line.new(b2, p2, b3, p3, color=color_corrective, width=2, style=line.style_dashed))  // Last wave dashed
 
-            // Place labels
-            label.new(b1, p1, "A", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.normal)
-            label.new(b2, p2, "B", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective, textcolor=color.white, size=size.normal)
-            label.new(b3, p3, "C", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.normal)
+            // Place labels (C is uncertain with ?)
+            array.set(legacy_corrective_labels, 0, label.new(b1, p1, "Ⓐ", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.normal))
+            array.set(legacy_corrective_labels, 1, label.new(b2, p2, "Ⓑ", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective, textcolor=color.white, size=size.normal))
+            array.set(legacy_corrective_labels, 2, label.new(b3, p3, "Ⓒ?", style=is_bullish ? label.style_label_down : label.style_label_up, color=color.new(color_corrective, 30), textcolor=color.white, size=size.normal))
 
 // Detect Connecting Waves (WXY)
 f_detect_connecting_wave_wxy() =>
