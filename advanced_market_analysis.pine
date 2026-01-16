@@ -1638,13 +1638,14 @@ f_detect_shark_advanced() =>
 // VII. WYCKOFF PATTERN DETECTION (와이코프 패턴 탐지)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Detect Wyckoff Accumulation Phases
+// Detect Wyckoff Accumulation & Distribution Phases (Enhanced with Volume)
 f_detect_wyckoff() =>
     if array.size(zz_price) >= 5 and show_wyckoff
         size = array.size(zz_price)
 
-        // Simplified Wyckoff detection based on price and volume patterns
-        // Look for: PS (Preliminary Support), AR (Automatic Rally), ST (Secondary Test), Spring
+        // Wyckoff Method with Volume Confirmation (Three Skills of Top Trading)
+        // Volume leads price - high volume confirms phase transitions
+        // Effort vs Result - high volume with small price move = absorption
 
         p0 = array.get(zz_price, size - 5)
         p1 = array.get(zz_price, size - 4)
@@ -1660,20 +1661,137 @@ f_detect_wyckoff() =>
 
         d0 = array.get(zz_direction, size - 5)
 
-        // Look for accumulation pattern (series of lows with rallies)
+        // Calculate volume metrics at key points
+        avg_volume = ta.sma(volume, 20)
+
+        // Helper function to get volume at specific bar
+        f_get_volume_at_bar(bar_idx) =>
+            bar_offset = bar_index - bar_idx
+            bar_offset >= 0 and bar_offset < 5000 ? volume[bar_offset] : avg_volume
+
+        // ═══════════════════════════════════════════════════════════════════
+        // ACCUMULATION PHASE (Bullish - Smart Money Buying)
+        // ═══════════════════════════════════════════════════════════════════
         if d0 == -1 and p1 > p0 and p2 < p1 and p3 > p2
-            // PS - Initial selling pressure stops
-            label.new(b0, p0, "PS", style=label.style_label_down, color=color_wyckoff, textcolor=color.white, size=size.tiny, tooltip="Preliminary Support")
+            // Volume at each phase point
+            vol_ps = f_get_volume_at_bar(b0)
+            vol_ar = f_get_volume_at_bar(b1)
+            vol_st = f_get_volume_at_bar(b2)
 
-            // AR - Automatic rally
-            label.new(b1, p1, "AR", style=label.style_label_up, color=color_wyckoff, textcolor=color.white, size=size.tiny, tooltip="Automatic Rally")
+            // PS - Preliminary Support: High volume selling exhaustion
+            ps_high_vol = vol_ps > avg_volume * 1.2
+            ps_label = ps_high_vol ? "PS ✓" : "PS"
+            ps_tooltip = ps_high_vol ?
+                        "Preliminary Support (Volume Confirmed)\nSelling climax with high volume" :
+                        "Preliminary Support\nInitial selling pressure stops"
 
-            // ST - Secondary test
-            label.new(b2, p2, "ST", style=label.style_label_down, color=color_wyckoff, textcolor=color.white, size=size.tiny, tooltip="Secondary Test")
+            label.new(b0, p0, ps_label, style=label.style_label_down,
+                     color=ps_high_vol ? color_wyckoff : color.new(color_wyckoff, 50),
+                     textcolor=color.white, size=size.tiny, tooltip=ps_tooltip)
 
-            // Check for spring (break below support then rally)
+            // AR - Automatic Rally: Volume should decrease (no supply)
+            ar_low_vol = vol_ar < avg_volume * 0.8
+            ar_label = ar_low_vol ? "AR ✓" : "AR"
+            ar_tooltip = ar_low_vol ?
+                        "Automatic Rally (Volume Confirmed)\nLow volume rally = lack of supply" :
+                        "Automatic Rally\nRally after selling stops"
+
+            label.new(b1, p1, ar_label, style=label.style_label_up,
+                     color=ar_low_vol ? color_wyckoff : color.new(color_wyckoff, 50),
+                     textcolor=color.white, size=size.tiny, tooltip=ar_tooltip)
+
+            // ST - Secondary Test: Low volume = no more sellers
+            st_low_vol = vol_st < avg_volume * 0.7
+            st_label = st_low_vol ? "ST ✓" : "ST"
+            st_tooltip = st_low_vol ?
+                        "Secondary Test (Volume Confirmed)\nLow volume test = absorption complete" :
+                        "Secondary Test\nTesting support level"
+
+            label.new(b2, p2, st_label, style=label.style_label_down,
+                     color=st_low_vol ? color_wyckoff : color.new(color_wyckoff, 50),
+                     textcolor=color.white, size=size.tiny, tooltip=st_tooltip)
+
+            // Spring: Break below support with volume spike (shakeout)
             if p4 < p2
-                label.new(b4, p4, "Spring", style=label.style_label_down, color=color_wyckoff, textcolor=color.white, size=size.tiny, tooltip="Spring")
+                vol_spring = f_get_volume_at_bar(b4)
+                spring_high_vol = vol_spring > avg_volume * 1.3
+                spring_label = spring_high_vol ? "Spring ✓" : "Spring"
+                spring_tooltip = spring_high_vol ?
+                                "Spring (Volume Confirmed)\nHigh volume shakeout = strong hands buying" :
+                                "Spring\nFalse breakdown below support"
+
+                label.new(b4, p4, spring_label, style=label.style_label_down,
+                         color=spring_high_vol ? color_wyckoff : color.new(color_wyckoff, 50),
+                         textcolor=color.white, size=size.tiny, tooltip=spring_tooltip)
+
+                // Draw "Accumulation Zone" label if all volume conditions met
+                if ps_high_vol and ar_low_vol and st_low_vol and spring_high_vol
+                    label.new(b2, (p0 + p2) / 2, "ACCUMULATION ZONE",
+                             style=label.style_none, textcolor=color.new(color_wyckoff, 0),
+                             size=size.normal,
+                             tooltip="All Wyckoff accumulation phases confirmed with volume\nStrong bullish setup")
+
+        // ═══════════════════════════════════════════════════════════════════
+        // DISTRIBUTION PHASE (Bearish - Smart Money Selling)
+        // ═══════════════════════════════════════════════════════════════════
+        if d0 == 1 and p1 < p0 and p2 > p1 and p3 < p2
+            // Volume at each phase point
+            vol_psy = f_get_volume_at_bar(b0)
+            vol_ar_dist = f_get_volume_at_bar(b1)
+            vol_st_dist = f_get_volume_at_bar(b2)
+
+            // PSY - Preliminary Supply: High volume buying climax
+            psy_high_vol = vol_psy > avg_volume * 1.2
+            psy_label = psy_high_vol ? "PSY ✓" : "PSY"
+            psy_tooltip = psy_high_vol ?
+                         "Preliminary Supply (Volume Confirmed)\nBuying climax with high volume" :
+                         "Preliminary Supply\nInitial buying pressure stops"
+
+            label.new(b0, p0, psy_label, style=label.style_label_up,
+                     color=psy_high_vol ? color.new(color.red, 0) : color.new(color.red, 50),
+                     textcolor=color.white, size=size.tiny, tooltip=psy_tooltip)
+
+            // AR - Automatic Reaction: Volume increases (supply appearing)
+            ar_high_vol = vol_ar_dist > avg_volume * 0.9
+            ar_label = ar_high_vol ? "AR ✓" : "AR"
+            ar_tooltip = ar_high_vol ?
+                        "Automatic Reaction (Volume Confirmed)\nSupply appears, sellers distribute" :
+                        "Automatic Reaction\nDrop after buying stops"
+
+            label.new(b1, p1, ar_label, style=label.style_label_down,
+                     color=ar_high_vol ? color.new(color.red, 0) : color.new(color.red, 50),
+                     textcolor=color.white, size=size.tiny, tooltip=ar_tooltip)
+
+            // ST - Secondary Test: High volume on rally = sellers distributing
+            st_high_vol = vol_st_dist > avg_volume * 0.8
+            st_label = st_high_vol ? "ST ✓" : "ST"
+            st_tooltip = st_high_vol ?
+                        "Secondary Test (Volume Confirmed)\nHigh volume rally = distribution ongoing" :
+                        "Secondary Test\nTesting resistance level"
+
+            label.new(b2, p2, st_label, style=label.style_label_up,
+                     color=st_high_vol ? color.new(color.red, 0) : color.new(color.red, 50),
+                     textcolor=color.white, size=size.tiny, tooltip=st_tooltip)
+
+            // UTAD - Upthrust After Distribution (break above resistance)
+            if p4 > p2
+                vol_utad = f_get_volume_at_bar(b4)
+                utad_high_vol = vol_utad > avg_volume * 1.3
+                utad_label = utad_high_vol ? "UTAD ✓" : "UTAD"
+                utad_tooltip = utad_high_vol ?
+                              "Upthrust After Distribution (Volume Confirmed)\nHigh volume false breakout = trap" :
+                              "Upthrust After Distribution\nFalse breakout above resistance"
+
+                label.new(b4, p4, utad_label, style=label.style_label_up,
+                         color=utad_high_vol ? color.new(color.red, 0) : color.new(color.red, 50),
+                         textcolor=color.white, size=size.tiny, tooltip=utad_tooltip)
+
+                // Draw "Distribution Zone" label if all volume conditions met
+                if psy_high_vol and ar_high_vol and st_high_vol and utad_high_vol
+                    label.new(b2, (p0 + p2) / 2, "DISTRIBUTION ZONE",
+                             style=label.style_none, textcolor=color.new(color.red, 0),
+                             size=size.normal,
+                             tooltip="All Wyckoff distribution phases confirmed with volume\nStrong bearish setup")
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VIII. DOW THEORY DETECTION (다우 이론 탐지)
