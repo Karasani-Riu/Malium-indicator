@@ -1634,6 +1634,77 @@ f_detect_shark_advanced() =>
             line.new(bd, d, bd + 10, target_50, color=color.new(color.teal, 50), width=1, style=line.style_dotted, extend=extend.right)
             label.new(bd + 5, target_50, "50% Target", style=label.style_none, textcolor=color.new(color.teal, 30), size=size.tiny)
 
+// Detect Alternate Bat Pattern (Scott Carney Vol 3)
+f_detect_alternate_bat() =>
+    if array.size(zz_price) >= 5 and show_harmonic
+        size = array.size(zz_price)
+
+        x = array.get(zz_price, size - 5)
+        a = array.get(zz_price, size - 4)
+        b = array.get(zz_price, size - 3)
+        c = array.get(zz_price, size - 2)
+        d = array.get(zz_price, size - 1)
+
+        bx = array.get(zz_bar, size - 5)
+        ba = array.get(zz_bar, size - 4)
+        bb = array.get(zz_bar, size - 3)
+        bc = array.get(zz_bar, size - 2)
+        bd = array.get(zz_bar, size - 1)
+
+        xab = f_retracement(x, a, b)
+        abc = f_retracement(a, b, c)
+        bcd = f_extension(b, c, d)
+        xad = f_extension(x, a, d)
+
+        // Alternate Bat ratios (distinct from standard Bat):
+        // B Point: 0.382 maximum (-3% tolerance)
+        // BC: 2.0-3.618 extension (much deeper than regular Bat)
+        // XAD: 0.886-1.13 (extends beyond 0.886)
+        // Uses 1.618 AB=CD structure (not standard AB=CD)
+
+        // B point must be 0.382 or less (tighter than standard Bat)
+        xab_match = xab <= FIB_0382 + fib_tolerance_min
+
+        // BC projection is much deeper: 2.0-3.618
+        bc_min_tol = f_flexible_tolerance(FIB_2000, FIB_1618, FIB_2240)
+        bc_max_tol = f_flexible_tolerance(FIB_3618, FIB_2618, FIB_4236)
+        bcd_match = (bcd >= FIB_2000 - bc_min_tol and bcd <= FIB_3618 + bc_max_tol)
+
+        // XAD extends to 0.886-1.13 (deeper than standard Bat's 0.886)
+        xad_min_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
+        xad_max_tol = f_flexible_tolerance(FIB_1130, FIB_1000, FIB_1272)
+        xad_match = (xad >= FIB_0886 - xad_min_tol and xad <= FIB_1130 + xad_max_tol)
+
+        // Check for 1.618 AB=CD (alternate structure)
+        ab_length = math.abs(b - a)
+        cd_length = math.abs(d - c)
+        abcd_ratio = cd_length / ab_length
+        alternate_abcd = math.abs(abcd_ratio - 1.618) < fib_tolerance_max
+
+        is_alternate_bat = xab_match and bcd_match and xad_match and alternate_abcd
+
+        is_potential = (not is_alternate_bat) and show_potential and xab_match and xad_match
+
+        if is_alternate_bat or is_potential
+            line_style = is_alternate_bat ? line.style_solid : line.style_dashed
+            pattern_label = is_alternate_bat ? "Alt Bat" : "Potential Alt Bat"
+
+            // Use orange color to distinguish from regular Bat
+            line.new(bx, x, ba, a, color=color.new(color.orange, 0), width=2, style=line_style)
+            line.new(ba, a, bb, b, color=color.new(color.orange, 0), width=2, style=line_style)
+            line.new(bb, b, bc, c, color=color.new(color.orange, 0), width=2, style=line_style)
+            line.new(bc, c, bd, d, color=color.new(color.orange, 0), width=2, style=line_style)
+
+            is_bullish = a > x
+
+            label.new(bx, x, "X", style=label.style_circle, color=color.orange, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=color.orange, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=color.orange, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=color.orange, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=color.orange, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color.orange, size=size.normal)
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // VII. WYCKOFF PATTERN DETECTION (와이코프 패턴 탐지)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1792,6 +1863,96 @@ f_detect_wyckoff() =>
                              style=label.style_none, textcolor=color.new(color.red, 0),
                              size=size.normal,
                              tooltip="All Wyckoff distribution phases confirmed with volume\nStrong bearish setup")
+
+        // ═══════════════════════════════════════════════════════════════════
+        // ADDITIONAL WYCKOFF SIGNALS: SOS, LPS, SOW, LPSY
+        // (Three Skills of Top Trading - Advanced Wyckoff Signals)
+        // ═══════════════════════════════════════════════════════════════════
+
+        // SOS (Sign of Strength) & LPS (Last Point of Support) - After Accumulation
+        // Check for upward breakout after accumulation with volume
+        if array.size(zz_price) >= 3
+            recent_size = array.size(zz_price)
+            p_prev2 = array.get(zz_price, recent_size - 3)
+            p_prev1 = array.get(zz_price, recent_size - 2)
+            p_current = array.get(zz_price, recent_size - 1)
+
+            b_prev2 = array.get(zz_bar, recent_size - 3)
+            b_prev1 = array.get(zz_bar, recent_size - 2)
+            b_current = array.get(zz_bar, recent_size - 1)
+
+            d_prev1 = array.get(zz_direction, recent_size - 2)
+
+            // SOS: Strong upward move with increasing volume (Jump Across Creek)
+            if d_prev1 == -1 and p_current > p_prev1  // Valley to peak (upward)
+                move_size = math.abs(p_current - p_prev1)
+                vol_at_sos = f_get_volume_at_bar(b_current)
+                sos_volume_confirmed = vol_at_sos > avg_volume * 1.3
+
+                // Check if this is breaking above previous resistance (JAC - Jump Across Creek)
+                is_breakout = p_current > p_prev2  // Current peak exceeds previous peak
+
+                if is_breakout and sos_volume_confirmed
+                    label.new(b_current, p_current, "SOS/JAC ✓", style=label.style_label_up,
+                             color=color.new(color.green, 0), textcolor=color.white, size=size.tiny,
+                             tooltip="Sign of Strength / Jump Across Creek\nVolume confirmed breakout above resistance")
+
+            // LPS: Pullback after SOS that holds support (Backup to Edge of Creek)
+            if d_prev1 == 1 and p_current < p_prev1  // Peak to valley (downward pullback)
+                pullback_size = math.abs(p_prev1 - p_current)
+                vol_at_lps = f_get_volume_at_bar(b_current)
+                lps_volume_confirmed = vol_at_lps < avg_volume * 0.7  // Low volume on pullback
+
+                // Check if pullback is shallow (held support)
+                pullback_ratio = pullback_size / math.abs(p_prev1 - p_prev2)
+                is_shallow_pullback = pullback_ratio < 0.5  // Less than 50% retracement
+
+                if is_shallow_pullback and lps_volume_confirmed and p_current > p_prev2
+                    label.new(b_current, p_current, "LPS ✓", style=label.style_label_down,
+                             color=color.new(color.green, 0), textcolor=color.white, size=size.tiny,
+                             tooltip="Last Point of Support\nLow volume pullback holding support\nGood long entry point")
+
+        // SOW (Sign of Weakness) & LPSY (Last Point of Supply) - After Distribution
+        if array.size(zz_price) >= 3
+            recent_size = array.size(zz_price)
+            p_prev2 = array.get(zz_price, recent_size - 3)
+            p_prev1 = array.get(zz_price, recent_size - 2)
+            p_current = array.get(zz_price, recent_size - 1)
+
+            b_prev2 = array.get(zz_bar, recent_size - 3)
+            b_prev1 = array.get(zz_bar, recent_size - 2)
+            b_current = array.get(zz_bar, recent_size - 1)
+
+            d_prev1 = array.get(zz_direction, recent_size - 2)
+
+            // SOW: Strong downward move with increasing volume
+            if d_prev1 == 1 and p_current < p_prev1  // Peak to valley (downward)
+                move_size = math.abs(p_prev1 - p_current)
+                vol_at_sow = f_get_volume_at_bar(b_current)
+                sow_volume_confirmed = vol_at_sow > avg_volume * 1.3
+
+                // Check if breaking below previous support
+                is_breakdown = p_current < p_prev2  // Current valley below previous valley
+
+                if is_breakdown and sow_volume_confirmed
+                    label.new(b_current, p_current, "SOW ✓", style=label.style_label_down,
+                             color=color.new(color.maroon, 0), textcolor=color.white, size=size.tiny,
+                             tooltip="Sign of Weakness\nVolume confirmed breakdown below support")
+
+            // LPSY: Rally after SOW that fails at resistance (Last Point of Supply)
+            if d_prev1 == -1 and p_current > p_prev1  // Valley to peak (upward rally)
+                rally_size = math.abs(p_current - p_prev1)
+                vol_at_lpsy = f_get_volume_at_bar(b_current)
+                lpsy_volume_confirmed = vol_at_lpsy > avg_volume * 0.8  // High volume on rally = supply
+
+                // Check if rally fails (doesn't break resistance)
+                rally_ratio = rally_size / math.abs(p_prev2 - p_prev1)
+                is_weak_rally = rally_ratio < 0.6  // Weak rally attempt
+
+                if is_weak_rally and lpsy_volume_confirmed and p_current < p_prev2
+                    label.new(b_current, p_current, "LPSY ✓", style=label.style_label_up,
+                             color=color.new(color.maroon, 0), textcolor=color.white, size=size.tiny,
+                             tooltip="Last Point of Supply\nHigh volume rally failing at resistance\nGood short entry point")
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VIII. DOW THEORY DETECTION (다우 이론 탐지)
@@ -2746,6 +2907,7 @@ if barstate.islast or barstate.isrealtime
     f_detect_deep_crab()
     f_detect_5_0_pattern()
     f_detect_shark_advanced()
+    f_detect_alternate_bat()
 
     // Wyckoff
     f_detect_wyckoff()
