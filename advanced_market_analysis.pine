@@ -1257,6 +1257,185 @@ f_detect_cypher() =>
 
             label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
 
+// Detect Deep Crab Pattern (Scott Carney)
+f_detect_deep_crab() =>
+    if array.size(zz_price) >= 5 and show_harmonic
+        size = array.size(zz_price)
+
+        x = array.get(zz_price, size - 5)
+        a = array.get(zz_price, size - 4)
+        b = array.get(zz_price, size - 3)
+        c = array.get(zz_price, size - 2)
+        d = array.get(zz_price, size - 1)
+
+        bx = array.get(zz_bar, size - 5)
+        ba = array.get(zz_bar, size - 4)
+        bb = array.get(zz_bar, size - 3)
+        bc = array.get(zz_bar, size - 2)
+        bd = array.get(zz_bar, size - 1)
+
+        xab = f_retracement(x, a, b)
+        abc = f_retracement(a, b, c)
+        bcd = f_extension(b, c, d)
+        xad = f_extension(x, a, d)
+
+        // Deep Crab ratios (Scott Carney Vol. 3):
+        // B point = 0.886 minimum (key differentiator)
+        // BC projection = 2.0 - 2.618
+        // XAD = 1.618 (triggers at 1.618 XA projection)
+
+        // B must be at least 0.886
+        b_min_match = xab >= 0.886 - fib_tolerance_min
+
+        abc_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
+        abc_max_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
+        abc_match = (abc >= FIB_0382 - abc_min_tol and abc <= FIB_0886 + abc_max_tol)
+
+        bcd_min_tol = f_flexible_tolerance(FIB_2000, FIB_1618, FIB_2240)
+        bcd_max_tol = f_flexible_tolerance(FIB_2618, FIB_2240, FIB_3000)
+        bcd_match = (bcd >= FIB_2000 - bcd_min_tol and bcd <= FIB_2618 + bcd_max_tol)
+
+        xad_match = f_within_flexible_tolerance(xad, FIB_1618, FIB_1414, FIB_2000)
+
+        is_deep_crab = b_min_match and abc_match and bcd_match and xad_match
+
+        is_potential = (not is_deep_crab) and show_potential and b_min_match and
+                       f_within_tolerance(xad, FIB_1618, fib_tolerance_max * 1.2)
+
+        if is_deep_crab or is_potential
+            line_style = is_deep_crab ? line.style_solid : line.style_dashed
+            pattern_label = is_deep_crab ? "Deep Crab" : "Potential Deep Crab"
+            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
+
+            is_bullish = a > x
+
+            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
+
+// Detect 5-0 Pattern (Scott Carney - Released 2005)
+f_detect_5_0_pattern() =>
+    if array.size(zz_price) >= 5 and show_harmonic
+        size = array.size(zz_price)
+
+        x = array.get(zz_price, size - 5)
+        a = array.get(zz_price, size - 4)
+        b = array.get(zz_price, size - 3)
+        c = array.get(zz_price, size - 2)
+        d = array.get(zz_price, size - 1)
+
+        bx = array.get(zz_bar, size - 5)
+        ba = array.get(zz_bar, size - 4)
+        bb = array.get(zz_bar, size - 3)
+        bc = array.get(zz_bar, size - 2)
+        bd = array.get(zz_bar, size - 1)
+
+        xab = f_retracement(x, a, b)
+        xad = f_retracement(x, a, d)
+
+        // 5-0 Pattern ratios (uses Reciprocal AB=CD):
+        // 0B point = 1.13 - 1.618 (critical validation)
+        // XAD = 0.50 OR 0.618 (dual PRZ levels)
+        // Focus on B point validation + reciprocal AB=CD
+
+        // Calculate 0B projection (from origin to B)
+        ob_projection = math.abs((b - x) / (a - x))
+        ob_match = (ob_projection >= 1.13 - fib_tolerance_max and ob_projection <= 1.618 + fib_tolerance_max)
+
+        // XAD must be 50% OR 61.8%
+        xad_50_match = f_within_flexible_tolerance(xad, 0.50, 0.382, 0.618)
+        xad_618_match = f_within_flexible_tolerance(xad, FIB_0618, FIB_0500, FIB_0786)
+        xad_match = xad_50_match or xad_618_match
+
+        is_5_0 = ob_match and xad_match
+
+        is_potential = (not is_5_0) and show_potential and ob_match
+
+        if is_5_0 or is_potential
+            line_style = is_5_0 ? line.style_solid : line.style_dashed
+            pattern_label = is_5_0 ? "5-0" : "Potential 5-0"
+            line.new(bx, x, ba, a, color=color.new(color.purple, 0), width=2, style=line_style)
+            line.new(ba, a, bb, b, color=color.new(color.purple, 0), width=2, style=line_style)
+            line.new(bb, b, bc, c, color=color.new(color.purple, 0), width=2, style=line_style)
+            line.new(bc, c, bd, d, color=color.new(color.purple, 0), width=2, style=line_style)
+
+            is_bullish = a > x
+
+            label.new(bx, x, "0", style=label.style_circle, color=color.purple, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=color.purple, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=color.purple, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=color.purple, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=color.purple, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color.purple, size=size.normal)
+
+// Detect Shark Pattern - Carney Advanced (Scott Carney - Released 2011)
+f_detect_shark_advanced() =>
+    if array.size(zz_price) >= 5 and show_harmonic
+        size = array.size(zz_price)
+
+        x = array.get(zz_price, size - 5)
+        a = array.get(zz_price, size - 4)
+        b = array.get(zz_price, size - 3)
+        c = array.get(zz_price, size - 2)
+        d = array.get(zz_price, size - 1)
+
+        bx = array.get(zz_bar, size - 5)
+        ba = array.get(zz_bar, size - 4)
+        bb = array.get(zz_bar, size - 3)
+        bc = array.get(zz_bar, size - 2)
+        bd = array.get(zz_bar, size - 1)
+
+        // Shark is unique - measures 0C extension instead of XAB
+        oc_extension = math.abs((c - x) / (a - x))
+        cd_extension = f_extension(c, d, d)  // Placeholder for reciprocal AB=CD
+        xad = f_extension(x, a, d)
+
+        // Shark ratios (precursor to 5-0):
+        // 0C = 1.13 - 1.618 (impulsive extension)
+        // XAD = 0.886 - 1.13 (88.6% + extension convergence)
+        // Initial target = 50% level
+
+        oc_match = (oc_extension >= 1.13 - fib_tolerance_max and oc_extension <= 1.618 + fib_tolerance_max)
+
+        xad_min_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
+        xad_max_tol = f_flexible_tolerance(FIB_1130, FIB_1000, FIB_1272)
+        xad_match = (xad >= FIB_0886 - xad_min_tol and xad <= FIB_1130 + xad_max_tol)
+
+        is_shark_pattern = oc_match and xad_match
+
+        is_potential = (not is_shark_pattern) and show_potential and oc_match
+
+        if is_shark_pattern or is_potential
+            line_style = is_shark_pattern ? line.style_solid : line.style_dashed
+            pattern_label = is_shark_pattern ? "Shark" : "Potential Shark"
+            line.new(bx, x, ba, a, color=color.new(color.teal, 0), width=2, style=line_style)
+            line.new(ba, a, bb, b, color=color.new(color.teal, 0), width=2, style=line_style)
+            line.new(bb, b, bc, c, color=color.new(color.teal, 0), width=2, style=line_style)
+            line.new(bc, c, bd, d, color=color.new(color.teal, 0), width=2, style=line_style)
+
+            is_bullish = a > x
+
+            label.new(bx, x, "0", style=label.style_circle, color=color.teal, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=color.teal, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=color.teal, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=color.teal, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=color.teal, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color.teal, size=size.normal)
+
+            // Add 50% target line for Shark initial profit target
+            target_50 = is_bullish ? d + (c - d) * 0.5 : d - (d - c) * 0.5
+            line.new(bd, d, bd + 10, target_50, color=color.new(color.teal, 50), width=1, style=line.style_dotted, extend=extend.right)
+            label.new(bd + 5, target_50, "50% Target", style=label.style_none, textcolor=color.new(color.teal, 30), size=size.tiny)
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // VII. WYCKOFF PATTERN DETECTION (와이코프 패턴 탐지)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2059,6 +2238,11 @@ if barstate.islast or barstate.isrealtime
     f_detect_crab()
     f_detect_shark()
     f_detect_cypher()
+
+    // Scott Carney Advanced Patterns
+    f_detect_deep_crab()
+    f_detect_5_0_pattern()
+    f_detect_shark_advanced()
 
     // Wyckoff
     f_detect_wyckoff()
