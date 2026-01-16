@@ -27,6 +27,9 @@ show_diametric = input.bool(true, title="  ↳ Show Diametric Formation (7-wave)
 show_extracting_triangle = input.bool(true, title="  ↳ Show Extracting Triangle", group=group_toggles)
 show_neutral_triangle = input.bool(true, title="  ↳ Show Neutral Triangle", group=group_toggles)
 show_terminal_5th = input.bool(true, title="  ↳ Show 5th Failure Terminal", group=group_toggles)
+show_elliott_channels = input.bool(true, title="  ↳ Show Elliott Wave Channels", group=group_toggles)
+show_alternation = input.bool(true, title="  ↳ Show Alternation Rules", group=group_toggles)
+show_extension_labels = input.bool(true, title="  ↳ Show Extension Relationships", group=group_toggles)
 
 // Chart Patterns (Bulkowski)
 show_chart_patterns = input.bool(true, title="Show Chart Patterns", group=group_toggles)
@@ -404,6 +407,96 @@ f_detect_major_impulse() =>
                      "5?", style=label.style_none, color=color.new(color.white, 100),
                      textcolor=color.new(color_impulse, 50), size=size.large, textalign=text.align_center))  // "5?" for uncertain last wave
 
+            // ═══════════════════════════════════════════════════════════════════════
+            // ELLIOTT WAVE ALTERNATION RULE (Visual Guide to Elliott Wave Trading)
+            // ═══════════════════════════════════════════════════════════════════════
+            // If Wave 2 is sharp (deep retrace 50%+), Wave 4 should be shallow (flat/triangle <50%)
+            // If Wave 2 is shallow, Wave 4 should be deep
+            if show_alternation
+                retrace4 = wave4 / wave3
+
+                // Classify Wave 2 and 4 patterns
+                wave2_sharp = retrace2 >= 0.50  // Sharp correction (Zigzag)
+                wave2_shallow = retrace2 < 0.50  // Shallow correction (Flat/Triangle)
+                wave4_shallow = retrace4 < 0.50
+                wave4_deep = retrace4 >= 0.50
+
+                // Check alternation rule
+                alternation_valid = (wave2_sharp and wave4_shallow) or (wave2_shallow and wave4_deep)
+
+                if not alternation_valid
+                    // Warning: Alternation rule violated
+                    warning_text = wave2_sharp ? "⚠ Alt: W2 Sharp + W4 Deep" : "⚠ Alt: W2 Shallow + W4 Shallow"
+                    label.new(b4, is_bullish ? p4 + label_offset_major * 2 : p4 - label_offset_major * 2,
+                             warning_text, style=label.style_none,
+                             textcolor=color.new(color.orange, 0), size=size.tiny)
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // ELLIOTT WAVE CHANNELING (Visual Guide to Elliott Wave Trading)
+            // ═══════════════════════════════════════════════════════════════════════
+            // Impulse waves travel within parallel channels
+            // Base channel: 0-2 baseline, parallel through Wave 1
+            // Wave 5 typically terminates at or near channel boundary
+            if show_elliott_channels
+                // Calculate channel slope from Wave 0 to Wave 2
+                bars_02 = b2 - b0
+                price_02 = p2 - p0
+                slope = bars_02 != 0 ? price_02 / bars_02 : 0
+
+                // Draw base channel line (0-2)
+                line.new(b0, p0, b2, p2, color=color.new(color_impulse, 60),
+                         width=1, style=line.style_dotted, extend=extend.right)
+
+                // Draw parallel channel line through Wave 1
+                // Project Wave 5 target at channel boundary
+                bars_to_5 = b5 - b0
+                channel_target = p0 + (slope * bars_to_5)
+                parallel_offset = p1 - (p0 + (slope * (b1 - b0)))
+                channel_parallel = channel_target + parallel_offset
+
+                line.new(b1, p1, b5, channel_parallel, color=color.new(color_impulse, 60),
+                         width=1, style=line.style_dotted, extend=extend.right)
+
+                label.new(b5 + 3, channel_parallel, "Ch", style=label.style_none,
+                         textcolor=color.new(color_impulse, 60), size=size.tiny)
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // EXTENSION RELATIONSHIPS (Visual Guide to Elliott Wave Trading)
+            // ═══════════════════════════════════════════════════════════════════════
+            // One wave extends (usually Wave 3), other two waves tend toward equality
+            // If Wave 3 extended, check if Wave 1 ≈ Wave 5
+            if show_extension_labels
+                // Identify which wave is extended (1.618x or greater than others)
+                wave1_extended = wave1 > wave3 * 1.618 or wave1 > wave5 * 1.618
+                wave3_extended = wave3 > wave1 * 1.618 or wave3 > wave5 * 1.618
+                wave5_extended = wave5 > wave1 * 1.618 or wave5 > wave3 * 1.618
+
+                extension_text = ""
+                equality_text = ""
+
+                if wave3_extended
+                    extension_text := "③ Ext"
+                    // Check Wave 1 ≈ Wave 5 equality
+                    ratio_15 = wave1 > wave5 ? wave5 / wave1 : wave1 / wave5
+                    if ratio_15 >= 0.90 and ratio_15 <= 1.10
+                        equality_text := "①≈⑤"
+                else if wave1_extended
+                    extension_text := "① Ext"
+                else if wave5_extended
+                    extension_text := "⑤ Ext"
+
+                // Display extension label
+                if extension_text != ""
+                    label.new(b3, is_bullish ? p3 - label_offset_major * 2.5 : p3 + label_offset_major * 2.5,
+                             extension_text, style=label.style_none,
+                             textcolor=color.new(color_impulse, 30), size=size.small)
+
+                // Display equality label
+                if equality_text != ""
+                    label.new(b5 + 5, is_bullish ? p5 - label_offset_major * 2 : p5 + label_offset_major * 2,
+                             equality_text, style=label.style_none,
+                             textcolor=color.new(color_impulse, 40), size=size.tiny)
+
 // Detect Major Corrective Waves (대파동 조정: A, B, C)
 f_detect_major_corrective() =>
     if array.size(major_zz_price) >= 4 and show_fractal_elliott and show_major_waves
@@ -523,6 +616,47 @@ f_detect_minor_impulse() =>
             array.set(minor_impulse_labels, 4, label.new(b5, is_bullish ? p5 - label_offset_minor : p5 + label_offset_minor,
                      "v?", style=label.style_none, color=color.new(color.white, 100),
                      textcolor=color.new(color_impulse, 50), size=size.tiny, textalign=text.align_center))  // "v?" for uncertain last wave
+
+            // Elliott Wave enhancements for minor waves
+            if show_alternation
+                retrace4 = wave4 / wave3
+                wave2_sharp = retrace2 >= 0.50
+                wave2_shallow = retrace2 < 0.50
+                wave4_shallow = retrace4 < 0.50
+                wave4_deep = retrace4 >= 0.50
+                alternation_valid = (wave2_sharp and wave4_shallow) or (wave2_shallow and wave4_deep)
+
+                if not alternation_valid
+                    warning_text = wave2_sharp ? "⚠ ii Sharp + iv Deep" : "⚠ ii Shallow + iv Shallow"
+                    label.new(b4, is_bullish ? p4 + label_offset_minor * 2 : p4 - label_offset_minor * 2,
+                             warning_text, style=label.style_none,
+                             textcolor=color.new(color.orange, 30), size=size.tiny)
+
+            if show_elliott_channels
+                bars_02 = b2 - b0
+                price_02 = p2 - p0
+                slope = bars_02 != 0 ? price_02 / bars_02 : 0
+
+                line.new(b0, p0, b2, p2, color=color.new(color_impulse, 70),
+                         width=1, style=line.style_dotted, extend=extend.right)
+
+                bars_to_5 = b5 - b0
+                channel_target = p0 + (slope * bars_to_5)
+                parallel_offset = p1 - (p0 + (slope * (b1 - b0)))
+                channel_parallel = channel_target + parallel_offset
+
+                line.new(b1, p1, b5, channel_parallel, color=color.new(color_impulse, 70),
+                         width=1, style=line.style_dotted, extend=extend.right)
+
+            if show_extension_labels
+                wave1_extended = wave1 > wave3 * 1.618 or wave1 > wave5 * 1.618
+                wave3_extended = wave3 > wave1 * 1.618 or wave3 > wave5 * 1.618
+                wave5_extended = wave5 > wave1 * 1.618 or wave5 > wave3 * 1.618
+
+                if wave3_extended
+                    label.new(b3, is_bullish ? p3 - label_offset_minor * 2 : p3 + label_offset_minor * 2,
+                             "iii Ext", style=label.style_none,
+                             textcolor=color.new(color_impulse, 40), size=size.tiny)
 
 // Detect Minor Corrective Waves (소파동 조정: a, b, c)
 f_detect_minor_corrective() =>
@@ -725,6 +859,68 @@ f_detect_impulse_wave() =>
             // Check and label diagonal
             if is_diagonal and show_diagonal
                 label.new(b3, p3 + (is_bullish ? atr_value * 2 : -atr_value * 2), "Diagonal?", style=label.style_none, color=color.new(color.white, 100), textcolor=color.new(color_impulse, 50), size=size.small)
+
+            // Elliott Wave enhancements for legacy impulse
+            if show_alternation
+                retrace4 = wave4 / wave3
+                wave2_sharp = retrace2 >= 0.50
+                wave2_shallow = retrace2 < 0.50
+                wave4_shallow = retrace4 < 0.50
+                wave4_deep = retrace4 >= 0.50
+                alternation_valid = (wave2_sharp and wave4_shallow) or (wave2_shallow and wave4_deep)
+
+                if not alternation_valid
+                    warning_text = wave2_sharp ? "⚠ Alt: ② Sharp + ④ Deep" : "⚠ Alt: ② Shallow + ④ Shallow"
+                    label.new(b4, is_bullish ? p4 - atr_value * 2 : p4 + atr_value * 2,
+                             warning_text, style=label.style_none,
+                             textcolor=color.new(color.orange, 0), size=size.tiny)
+
+            if show_elliott_channels
+                bars_02 = b2 - b0
+                price_02 = p2 - p0
+                slope = bars_02 != 0 ? price_02 / bars_02 : 0
+
+                line.new(b0, p0, b2, p2, color=color.new(color_impulse, 60),
+                         width=1, style=line.style_dotted, extend=extend.right)
+
+                bars_to_5 = b5 - b0
+                channel_target = p0 + (slope * bars_to_5)
+                parallel_offset = p1 - (p0 + (slope * (b1 - b0)))
+                channel_parallel = channel_target + parallel_offset
+
+                line.new(b1, p1, b5, channel_parallel, color=color.new(color_impulse, 60),
+                         width=1, style=line.style_dotted, extend=extend.right)
+
+                label.new(b5 + 3, channel_parallel, "Ch", style=label.style_none,
+                         textcolor=color.new(color_impulse, 60), size=size.tiny)
+
+            if show_extension_labels
+                wave1_extended = wave1 > wave3 * 1.618 or wave1 > wave5 * 1.618
+                wave3_extended = wave3 > wave1 * 1.618 or wave3 > wave5 * 1.618
+                wave5_extended = wave5 > wave1 * 1.618 or wave5 > wave3 * 1.618
+
+                extension_text = ""
+                equality_text = ""
+
+                if wave3_extended
+                    extension_text := "③ Ext"
+                    ratio_15 = wave1 > wave5 ? wave5 / wave1 : wave1 / wave5
+                    if ratio_15 >= 0.90 and ratio_15 <= 1.10
+                        equality_text := "①≈⑤"
+                else if wave1_extended
+                    extension_text := "① Ext"
+                else if wave5_extended
+                    extension_text := "⑤ Ext"
+
+                if extension_text != ""
+                    label.new(b3, is_bullish ? p3 + atr_value * 2 : p3 - atr_value * 2,
+                             extension_text, style=label.style_none,
+                             textcolor=color.new(color_impulse, 30), size=size.small)
+
+                if equality_text != ""
+                    label.new(b5 + 5, is_bullish ? p5 + atr_value : p5 - atr_value,
+                             equality_text, style=label.style_none,
+                             textcolor=color.new(color_impulse, 40), size=size.tiny)
 
 // Detect Corrective Waves (ABC)
 f_detect_corrective_wave() =>
