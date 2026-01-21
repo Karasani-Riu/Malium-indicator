@@ -1629,10 +1629,10 @@ f_detect_shark_advanced() =>
 
             label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color.teal, size=size.normal)
 
-            // Add 50% target line for Shark initial profit target
+            // Add 50% retracement reference level (educational)
             target_50 = is_bullish ? d + (c - d) * 0.5 : d - (d - c) * 0.5
             line.new(bd, d, bd + 10, target_50, color=color.new(color.teal, 50), width=1, style=line.style_dotted, extend=extend.right)
-            label.new(bd + 5, target_50, "50% Target", style=label.style_none, textcolor=color.new(color.teal, 30), size=size.tiny)
+            label.new(bd + 5, target_50, "50% Level", style=label.style_none, textcolor=color.new(color.teal, 30), size=size.tiny)
 
 // Detect Alternate Bat Pattern (Scott Carney Vol 3)
 f_detect_alternate_bat() =>
@@ -1910,7 +1910,7 @@ f_detect_wyckoff() =>
                 if is_shallow_pullback and lps_volume_confirmed and p_current > p_prev2
                     label.new(b_current, p_current, "LPS ✓", style=label.style_label_down,
                              color=color.new(color.green, 0), textcolor=color.white, size=size.tiny,
-                             tooltip="Last Point of Support\nLow volume pullback holding support\nGood long entry point")
+                             tooltip="Last Point of Support\nLow volume pullback holding support\nTypical Wyckoff accumulation signal")
 
         // SOW (Sign of Weakness) & LPSY (Last Point of Supply) - After Distribution
         if array.size(zz_price) >= 3
@@ -1952,7 +1952,7 @@ f_detect_wyckoff() =>
                 if is_weak_rally and lpsy_volume_confirmed and p_current < p_prev2
                     label.new(b_current, p_current, "LPSY ✓", style=label.style_label_up,
                              color=color.new(color.maroon, 0), textcolor=color.white, size=size.tiny,
-                             tooltip="Last Point of Supply\nHigh volume rally failing at resistance\nGood short entry point")
+                             tooltip="Last Point of Supply\nHigh volume rally failing at resistance\nTypical Wyckoff distribution signal")
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VIII. DOW THEORY DETECTION (다우 이론 탐지)
@@ -2261,7 +2261,7 @@ f_detect_livermore_cylinder() =>
                                  color=color.new(color.green, 0),
                                  textcolor=color.white,
                                  size=size.normal,
-                                 tooltip="Livermore Cylinder CONFIRMED Bullish Breakout\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nStrong upward move expected")
+                                 tooltip="Livermore Cylinder CONFIRMED Bullish Breakout\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nHistorically significant breakout pattern")
                         // Draw strong arrow for confirmed breakout
                         line.new(bar_index - 1, cylinder_high, bar_index + 5, cylinder_high + (cylinder_high - cylinder_low),
                                 color=color.new(color.green, 0),
@@ -2274,7 +2274,7 @@ f_detect_livermore_cylinder() =>
                                  color=color.new(color.green, 50),
                                  textcolor=color.white,
                                  size=size.small,
-                                 tooltip="Cylinder breakout without volume confirmation\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nMay fail - use caution")
+                                 tooltip="Cylinder breakout without volume confirmation\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nLower probability pattern")
                         // Draw dashed arrow for weak breakout
                         line.new(bar_index - 1, cylinder_high, bar_index + 5, cylinder_high + (cylinder_high - cylinder_low) * 0.5,
                                 color=color.new(color.green, 50),
@@ -2288,7 +2288,7 @@ f_detect_livermore_cylinder() =>
                                  color=color.new(color.red, 0),
                                  textcolor=color.white,
                                  size=size.normal,
-                                 tooltip="Livermore Cylinder CONFIRMED Bearish Breakout\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nStrong downward move expected")
+                                 tooltip="Livermore Cylinder CONFIRMED Bearish Breakout\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nHistorically significant breakdown pattern")
                         // Draw strong arrow for confirmed breakout
                         line.new(bar_index - 1, cylinder_low, bar_index + 5, cylinder_low - (cylinder_high - cylinder_low),
                                 color=color.new(color.red, 0),
@@ -2301,7 +2301,7 @@ f_detect_livermore_cylinder() =>
                                  color=color.new(color.red, 50),
                                  textcolor=color.white,
                                  size=size.small,
-                                 tooltip="Cylinder breakout without volume confirmation\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nMay fail - use caution")
+                                 tooltip="Cylinder breakout without volume confirmation\nVolume: " + str.tostring(volume_ratio, "#.##") + "x average\nLower probability pattern")
                         // Draw dashed arrow for weak breakout
                         line.new(bar_index - 1, cylinder_low, bar_index + 5, cylinder_low - (cylinder_high - cylinder_low) * 0.5,
                                 color=color.new(color.red, 50),
@@ -2567,9 +2567,9 @@ f_detect_head_shoulders() =>
                          color=color_chart_pattern, textcolor=color.white, size=size.tiny)
 
                 label.new(b3, p3 + atr_value * 2,
-                         "HEAD & SHOULDERS TOP\nTarget: " + str.tostring(target, format.mintick),
+                         "HEAD & SHOULDERS TOP\nProjection: " + str.tostring(target, format.mintick),
                          style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
-                         tooltip="Bearish reversal pattern | Success rate: 83% (Bulkowski)")
+                         tooltip="Classic reversal pattern | Historical success rate: 83% (Bulkowski)")
 
         // HEAD & SHOULDERS BOTTOM: Head is lowest
         if d1 == -1  // Starting with valley
@@ -2605,9 +2605,9 @@ f_detect_head_shoulders() =>
                          color=color_chart_pattern, textcolor=color.white, size=size.tiny)
 
                 label.new(b3, p3 - atr_value * 2,
-                         "HEAD & SHOULDERS BOTTOM\nTarget: " + str.tostring(target, format.mintick),
+                         "HEAD & SHOULDERS BOTTOM\nProjection: " + str.tostring(target, format.mintick),
                          style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
-                         tooltip="Bullish reversal pattern | Success rate: 87% (Bulkowski)")
+                         tooltip="Classic reversal pattern | Historical success rate: 87% (Bulkowski)")
 
 // Detect Double Top/Bottom (with Adam & Eve variations)
 f_detect_double_patterns() =>
@@ -2652,9 +2652,9 @@ f_detect_double_patterns() =>
                 target = neckline - pattern_height
 
                 label.new(b2, p2 + atr_value * 2,
-                         "DOUBLE TOP\n" + pattern_type + "\nTarget: " + str.tostring(target, format.mintick),
+                         "DOUBLE TOP\n" + pattern_type + "\nProjection: " + str.tostring(target, format.mintick),
                          style=label.style_none, textcolor=color_chart_pattern, size=size.small,
-                         tooltip="Bearish reversal | Best: Eve & Eve (50% avg decline)")
+                         tooltip="Classic reversal pattern | Best: Eve & Eve (Bulkowski)")
 
         // DOUBLE BOTTOM
         if d1 == -1
@@ -2677,9 +2677,9 @@ f_detect_double_patterns() =>
                 target = neckline + pattern_height
 
                 label.new(b2, p2 - atr_value * 2,
-                         "DOUBLE BOTTOM\n" + pattern_type + "\nTarget: " + str.tostring(target, format.mintick),
+                         "DOUBLE BOTTOM\n" + pattern_type + "\nProjection: " + str.tostring(target, format.mintick),
                          style=label.style_none, textcolor=color_chart_pattern, size=size.small,
-                         tooltip="Bullish reversal | Best: Eve & Eve (50% avg rise)")
+                         tooltip="Classic reversal pattern | Best: Eve & Eve (Bulkowski)")
 
 // Detect Rectangle Patterns (Bulkowski - High Success Rate)
 f_detect_rectangles() =>
@@ -2739,9 +2739,9 @@ f_detect_rectangles() =>
                 target = resistance + pattern_height
 
                 label.new(b3, (support + resistance) / 2,
-                         "RECTANGLE BOTTOM\nTarget: " + str.tostring(target, format.mintick),
+                         "RECTANGLE BOTTOM\nProjection: " + str.tostring(target, format.mintick),
                          style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
-                         tooltip="Bullish continuation | Success rate: 85% (Bulkowski)")
+                         tooltip="Continuation pattern | Historical success rate: 85% (Bulkowski)")
 
         if d0 == 1  // Starting from peak (Rectangle Top - BEARISH)
             // Peaks: p0, p2, p4 should be near equal (resistance level)
@@ -2771,9 +2771,9 @@ f_detect_rectangles() =>
                 target = support - pattern_height
 
                 label.new(b3, (support + resistance) / 2,
-                         "RECTANGLE TOP\nTarget: " + str.tostring(target, format.mintick),
+                         "RECTANGLE TOP\nProjection: " + str.tostring(target, format.mintick),
                          style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
-                         tooltip="Bearish continuation | Success rate: 80% (Bulkowski)")
+                         tooltip="Continuation pattern | Historical success rate: 80% (Bulkowski)")
 
 // Detect Diamond Patterns (Bulkowski - High Success Rate)
 f_detect_diamonds() =>
@@ -2833,9 +2833,9 @@ f_detect_diamonds() =>
                 target = p6 + pattern_height
 
                 label.new(b3, p3 + atr_value * 2,
-                         "DIAMOND BOTTOM\nTarget: " + str.tostring(target, format.mintick),
+                         "DIAMOND BOTTOM\nProjection: " + str.tostring(target, format.mintick),
                          style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
-                         tooltip="Bullish reversal | Success rate: 81% (Bulkowski)")
+                         tooltip="Reversal pattern | Historical success rate: 81% (Bulkowski)")
 
         // DIAMOND TOP (Bearish reversal)
         if d0 == 1  // Starting from peak
@@ -2862,9 +2862,9 @@ f_detect_diamonds() =>
                 target = p6 - pattern_height
 
                 label.new(b3, p3 - atr_value * 2,
-                         "DIAMOND TOP\nTarget: " + str.tostring(target, format.mintick),
+                         "DIAMOND TOP\nProjection: " + str.tostring(target, format.mintick),
                          style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
-                         tooltip="Bearish reversal | Success rate: 78% (Bulkowski)")
+                         tooltip="Reversal pattern | Historical success rate: 78% (Bulkowski)")
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // XV. MAIN EXECUTION (메인 실행)
