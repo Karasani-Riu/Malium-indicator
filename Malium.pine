@@ -751,13 +751,15 @@ f_within_flexible_tolerance(value, target, prev_level=na, next_level=na) =>
     tolerance = f_flexible_tolerance(target, prev_level, next_level)
     math.abs(value - target) <= tolerance
 
-// Calculate retracement ratio
+// Calculate retracement ratio (with zero-division protection)
 f_retracement(a, b, c) =>
-    math.abs((c - b) / (a - b))
+    divisor = (a - b)
+    divisor != 0 ? math.abs((c - b) / divisor) : 0.0
 
-// Calculate extension ratio
+// Calculate extension ratio (with zero-division protection)
 f_extension(a, b, c) =>
-    math.abs((c - b) / (a - b))
+    divisor = (a - b)
+    divisor != 0 ? math.abs((c - b) / divisor) : 0.0
 
 // Get ATR for label offset calculation
 atr_value = ta.atr(14)
@@ -1153,7 +1155,8 @@ f_calculate_prz(x, a, b, c, is_bullish) =>
         // Count how many levels are within 1% of this level
         for j = 0 to array.size(prz_levels) - 1
             other_level = array.get(prz_levels, j)
-            if math.abs(other_level - level) / level <= 0.01  // Within 1%
+            // Zero-division protection
+            if level != 0 and math.abs(other_level - level) / level <= 0.01  // Within 1%
                 confluence_count += 1
 
         if confluence_count > max_confluence
@@ -1838,18 +1841,20 @@ f_detect_three_drives() =>
         retrace1 = f_retracement(p0, p1, p2)
         retrace2 = f_retracement(p2, p3, p4)
 
-        // Calculate time symmetry
+        // Calculate time symmetry (with zero-division protection)
         time1 = b1 - b0
         time2 = b3 - b2
         time3 = b5 - b4
-        time_symmetric = math.abs(time2 / time1 - 1.0) < 0.3 and math.abs(time3 / time2 - 1.0) < 0.3
+        time_symmetric = (time1 != 0 and time2 != 0) and
+                        math.abs(time2 / time1 - 1.0) < 0.3 and
+                        math.abs(time3 / time2 - 1.0) < 0.3
 
-        // Three Drives ratios:
+        // Three Drives ratios (with zero-division protection):
         // Each drive approximately equal or 127.2%/161.8% extensions
         // Retracements typically 61.8% or 78.6%
 
-        drive2_ratio = drive2 / drive1
-        drive3_ratio = drive3 / drive2
+        drive2_ratio = drive1 != 0 ? drive2 / drive1 : 0.0
+        drive3_ratio = drive2 != 0 ? drive3 / drive2 : 0.0
 
         // Drives should be approximately equal or follow 1.272/1.618 extensions
         drives_equal = (math.abs(drive2_ratio - 1.0) < fib_tolerance_max) and
@@ -1907,13 +1912,13 @@ f_detect_abcd() =>
 
         // Calculate ratios
         abc = f_retracement(a, b, c)
-        bcd = f_extension(b, c, d)
+        // Note: bcd removed - not used in AB=CD pattern validation
 
         // AB=CD: Classic ratio is 1.0 (AB equals CD)
         // Also valid: 1.272 or 1.618 extensions
         ab_length = math.abs(b - a)
         cd_length = math.abs(d - c)
-        abcd_ratio = cd_length / ab_length
+        abcd_ratio = ab_length != 0 ? cd_length / ab_length : 0.0
 
         // BC retracement should be 0.382-0.886
         abc_valid = (abc >= FIB_0382 - fib_tolerance_max and abc <= FIB_0886 + fib_tolerance_max)
@@ -1925,10 +1930,10 @@ f_detect_abcd() =>
         extended_abcd = (math.abs(abcd_ratio - FIB_1272) < fib_tolerance_max) or
                         (math.abs(abcd_ratio - FIB_1618) < fib_tolerance_max)
 
-        // Time equality (AB time ≈ CD time)
+        // Time equality (AB time ≈ CD time) with zero-division protection
         time_ab = bb - ba
         time_cd = bd - bc
-        time_equal = math.abs(time_cd / time_ab - 1.0) < 0.2  // Within 20%
+        time_equal = time_ab != 0 ? math.abs(time_cd / time_ab - 1.0) < 0.2 : false
 
         is_abcd = abc_valid and (perfect_abcd or extended_abcd) and time_equal
         is_potential = (not is_abcd) and show_potential and abc_valid and (perfect_abcd or extended_abcd)
@@ -2628,12 +2633,14 @@ f_detect_cup_and_handle() =>
         left_rim_high = ta.highest(high, lookback)[lookback]
         right_rim_high = ta.highest(high, 10)
 
-        // Rims should be approximately equal (within 5%)
-        rims_equal = math.abs(right_rim_high - left_rim_high) / left_rim_high <= 0.05
+        // Rims should be approximately equal (within 5%) with zero-division protection
+        rims_equal = left_rim_high != 0 ?
+                     math.abs(right_rim_high - left_rim_high) / left_rim_high <= 0.05 :
+                     false
 
-        // Cup depth should be reasonable (10-50% of left rim)
+        // Cup depth should be reasonable (10-50% of left rim) with zero-division protection
         cup_depth = left_rim_high - cup_low
-        cup_depth_ratio = cup_depth / left_rim_high
+        cup_depth_ratio = left_rim_high != 0 ? cup_depth / left_rim_high : 0.0
         valid_cup_depth = cup_depth_ratio >= 0.10 and cup_depth_ratio <= 0.50
 
         // Cup should be U-shaped (gradual decline and rise)
