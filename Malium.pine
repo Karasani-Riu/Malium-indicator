@@ -142,6 +142,7 @@ var float FIB_2236 = 2.236  // 223.6% - Common Wave (iii) extension
 var float FIB_2382 = 2.382  // 238.2%
 var float FIB_2764 = 2.764  // 276.4% - Frequent Wave (iii) target
 var float FIB_2854 = 2.854  // 285.4% - Frequent Wave (iii) target
+var float FIB_3000 = 3.000  // 300% - Common BCD extension
 var float FIB_3618 = 3.618  // 361.8%
 var float FIB_4236 = 4.236  // 423.6%
 
