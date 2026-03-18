@@ -1955,6 +1955,444 @@ f_detect_wyckoff() =>
                              tooltip="Last Point of Supply\nHigh volume rally failing at resistance\nTypical Wyckoff distribution signal")
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VII-B. WYCKOFF 9 BUYING/SELLING TESTS (Richard Wyckoff - 매수/매도 9원칙)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Wyckoff's 9 Buying Tests - Systematic Accumulation Confirmation
+// Source: Richard D. Wyckoff "Studies in Tape Reading" / Hank Pruden "The Three Skills"
+f_detect_wyckoff_9_tests() =>
+    if show_wyckoff and array.size(zz_price) >= 6
+        size = array.size(zz_price)
+        avg_vol = ta.sma(volume, 20)
+        atr = ta.atr(14)
+
+        // Recent ZigZag structure (last 6 pivots)
+        p0 = array.get(zz_price, size - 6)
+        p1 = array.get(zz_price, size - 5)
+        p2 = array.get(zz_price, size - 4)
+        p3 = array.get(zz_price, size - 3)
+        p4 = array.get(zz_price, size - 2)
+        p5 = array.get(zz_price, size - 1)
+
+        b0 = array.get(zz_bar, size - 6)
+        b5 = array.get(zz_bar, size - 1)
+
+        d0 = array.get(zz_direction, size - 6)
+
+        f_vol_at(bi) =>
+            offset = bar_index - bi
+            offset >= 0 and offset < 5000 ? volume[offset] : avg_vol
+
+        // ── BUYING TESTS (9 Tests for Accumulation) ──────────────────────────
+        // Test 1: Price objective satisfied (prior declining trend exists)
+        test1_buy = p0 > p1  // Prior decline: trough at p0 is lower peak -> valley
+
+        // Test 2: Preliminary Support & Selling Climax (SC)
+        // High volume at the low + wide spread bar
+        vol_at_sc = f_vol_at(b0)
+        bar_range_sc = math.abs(p1 - p0)
+        test2_buy = vol_at_sc > avg_vol * 1.5 and bar_range_sc > atr * 1.2
+
+        // Test 3: Secondary Test - Volume diminishing on down-tests
+        vol_at_st = f_vol_at(array.get(zz_bar, size - 4))
+        test3_buy = vol_at_st < vol_at_sc * 0.7  // Volume decreasing
+
+        // Test 4: Downtrend line broken (price structure improving)
+        // Higher lows forming: p4 > p2 > p0 (all valleys going up)
+        test4_buy = d0 == -1 and p4 > p2 and p2 > p0
+
+        // Test 5: Higher lows (bullish reaction structure)
+        test5_buy = d0 == -1 and p4 > p0  // More recent low is higher
+
+        // Test 6: Series of Higher Highs and Higher Lows (HH + HL)
+        has_hh = p5 > p3 and p3 > p1  // Higher highs
+        has_hl = p4 > p2 and p2 > p0  // Higher lows
+        test6_buy = d0 == -1 and has_hh and has_hl
+
+        // Test 7: Effort vs Result - Volume diminishing on reactions
+        // Low volume on down-moves = lack of supply
+        recent_down_vol = f_vol_at(array.get(zz_bar, size - 2))
+        test7_buy = recent_down_vol < avg_vol * 0.8
+
+        // Test 8: Base Building - Range contraction (stock consolidating)
+        price_range_recent = ta.highest(high, 20) - ta.lowest(low, 20)
+        price_range_prior  = ta.highest(high, 60) - ta.lowest(low, 60)
+        test8_buy = price_range_recent < price_range_prior * 0.5  // Range narrowing
+
+        // Test 9: Price stronger than prior decline
+        // Current low is within 30% retracement of the whole decline
+        total_decline = math.abs(p1 - p0)
+        test9_buy = total_decline > 0 and (close - p0) / total_decline > 0.3
+
+        // Count passing tests
+        buy_score = (test1_buy ? 1 : 0) + (test2_buy ? 1 : 0) + (test3_buy ? 1 : 0) +
+                   (test4_buy ? 1 : 0) + (test5_buy ? 1 : 0) + (test6_buy ? 1 : 0) +
+                   (test7_buy ? 1 : 0) + (test8_buy ? 1 : 0) + (test9_buy ? 1 : 0)
+
+        // ── SELLING TESTS (9 Tests for Distribution) ─────────────────────────
+        // Test 1: Prior advancing trend exists
+        test1_sell = p0 < p1  // Prior rise
+
+        // Test 2: Buying Climax (BC) - High volume at the high
+        vol_at_bc = f_vol_at(b0)
+        test2_sell = vol_at_bc > avg_vol * 1.5
+
+        // Test 3: Secondary Test - Volume diminishing on up-tests
+        test3_sell = vol_at_st < vol_at_bc * 0.7
+
+        // Test 4: Uptrend line broken (lower highs forming)
+        test4_sell = d0 == 1 and p4 < p2 and p2 < p0
+
+        // Test 5: Lower highs (bearish reaction structure)
+        test5_sell = d0 == 1 and p4 < p0
+
+        // Test 6: Series of Lower Highs and Lower Lows
+        has_lh = p5 < p3 and p3 < p1  // Lower highs
+        has_ll = p4 < p2 and p2 < p0  // Lower lows
+        test6_sell = d0 == 1 and has_lh and has_ll
+
+        // Test 7: Volume expanding on declines (supply present)
+        test7_sell = recent_down_vol > avg_vol * 1.1
+
+        // Test 8: Range expansion on down-moves
+        test8_sell = price_range_recent > price_range_prior * 0.6 and
+                    math.abs(p5 - p4) > math.abs(p3 - p2)  // Recent decline larger
+
+        // Test 9: Price weaker than prior advance
+        total_advance = math.abs(p1 - p0)
+        test9_sell = total_advance > 0 and (p0 - close) / total_advance > 0.3
+
+        sell_score = (test1_sell ? 1 : 0) + (test2_sell ? 1 : 0) + (test3_sell ? 1 : 0) +
+                    (test4_sell ? 1 : 0) + (test5_sell ? 1 : 0) + (test6_sell ? 1 : 0) +
+                    (test7_sell ? 1 : 0) + (test8_sell ? 1 : 0) + (test9_sell ? 1 : 0)
+
+        // Display 9-Test scoreboard on last bar
+        if barstate.islast
+            var table wyckoff9_table = table.new(position.bottom_left, 3, 11, border_width=1, border_color=color.new(color.gray, 70))
+            table.cell(wyckoff9_table, 0, 0, "Wyckoff 9 Tests",
+                      bgcolor=color.new(color_wyckoff, 60), text_color=color.white, text_size=size.small)
+            table.cell(wyckoff9_table, 1, 0, "Buy (" + str.tostring(buy_score) + "/9)",
+                      bgcolor=color.new(color.green, 50), text_color=color.white, text_size=size.small)
+            table.cell(wyckoff9_table, 2, 0, "Sell (" + str.tostring(sell_score) + "/9)",
+                      bgcolor=color.new(color.red, 50), text_color=color.white, text_size=size.small)
+
+            test_names = array.from("1:Prior Trend", "2:SC/BC Volume", "3:Vol Diminish",
+                                   "4:Trend Break", "5:Higher Lows", "6:HH+HL",
+                                   "7:Effort/Result", "8:Base Build", "9:Strength")
+            buy_tests  = array.from(test1_buy, test2_buy, test3_buy, test4_buy, test5_buy,
+                                   test6_buy, test7_buy, test8_buy, test9_buy)
+            sell_tests = array.from(test1_sell, test2_sell, test3_sell, test4_sell, test5_sell,
+                                   test6_sell, test7_sell, test8_sell, test9_sell)
+
+            for i = 0 to 8
+                t_name  = array.get(test_names, i)
+                t_buy   = array.get(buy_tests, i)
+                t_sell  = array.get(sell_tests, i)
+
+                table.cell(wyckoff9_table, 0, i + 1, t_name,
+                          text_color=color.white, text_size=size.tiny)
+                table.cell(wyckoff9_table, 1, i + 1, t_buy ? "✓" : "–",
+                          bgcolor=t_buy  ? color.new(color.green, 40) : color.new(color.gray, 80),
+                          text_color=color.white, text_size=size.tiny)
+                table.cell(wyckoff9_table, 2, i + 1, t_sell ? "✓" : "–",
+                          bgcolor=t_sell ? color.new(color.red,   40) : color.new(color.gray, 80),
+                          text_color=color.white, text_size=size.tiny)
+
+        // High-confidence signal labels (≥7/9 tests passing)
+        if barstate.isconfirmed
+            if buy_score >= 7 and d0 == -1
+                label.new(b5, p5, "W9 BUY\n" + str.tostring(buy_score) + "/9 ✓",
+                         style=label.style_label_up, color=color.new(color_wyckoff, 0),
+                         textcolor=color.white, size=size.normal,
+                         tooltip="Wyckoff 9 Buying Tests\n" + str.tostring(buy_score) + " of 9 tests passed\nHigh-confidence accumulation zone\n(Educational - Richard Wyckoff)")
+            if sell_score >= 7 and d0 == 1
+                label.new(b5, p5, "W9 SELL\n" + str.tostring(sell_score) + "/9 ✓",
+                         style=label.style_label_down, color=color.new(color.red, 0),
+                         textcolor=color.white, size=size.normal,
+                         tooltip="Wyckoff 9 Selling Tests\n" + str.tostring(sell_score) + " of 9 tests passed\nHigh-confidence distribution zone\n(Educational - Richard Wyckoff)")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VII-C. BUMP-AND-RUN REVERSAL (Thomas Bulkowski - 55% Success Rate)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Bump-and-Run Reversal: Three phases - Lead-in → Bump → Run
+// Source: Thomas Bulkowski "Encyclopedia of Chart Patterns" - 55% breakout rate
+f_detect_bump_and_run() =>
+    if show_chart_patterns and barstate.isconfirmed
+        // Parameters for pattern detection
+        lead_in_len    = 20   // Bars for lead-in trendline
+        bump_threshold = 2.0  // Bump slope must be 2x lead-in slope
+        min_bump_bars  = 5    // Minimum bars in bump phase
+        avg_vol        = ta.sma(volume, 20)
+
+        // ── LEAD-IN PHASE: Gentle uptrend ─────────────────────────────────
+        // Calculate slope of recent highs over lead-in period
+        lead_in_high_start = ta.highest(high, lead_in_len)[lead_in_len]
+        lead_in_high_end   = ta.highest(high, 5)
+        lead_in_slope = (lead_in_high_end - lead_in_high_start) / lead_in_len
+
+        // Lead-in must be gently rising (positive but moderate slope)
+        is_gentle_uptrend = lead_in_slope > 0 and
+                           lead_in_slope < (lead_in_high_start * 0.005)  // < 0.5% per bar
+
+        // ── BUMP PHASE: Steep acceleration ────────────────────────────────
+        // Recent steep rise = Bump (2x slope of lead-in)
+        bump_high_start = ta.highest(high, min_bump_bars)[min_bump_bars]
+        bump_high_end   = high
+        bump_slope      = (bump_high_end - bump_high_start) / min_bump_bars
+
+        // Bump must be steeper than lead-in by threshold factor
+        is_steep_bump   = lead_in_slope != 0 and
+                         bump_slope > (math.abs(lead_in_slope) * bump_threshold)
+
+        // Volume should increase during bump phase
+        recent_vol  = ta.sma(volume, min_bump_bars)
+        vol_expand  = recent_vol > avg_vol * 1.2  // Volume expansion in bump
+
+        // ── RUN PHASE: Reversal back to lead-in line ──────────────────────
+        // Price starts reversing from bump high
+        // Identify if price crossed back below the projected lead-in trendline
+        projected_lead_in = lead_in_high_end  // The trendline level
+
+        // Check if we have a reversal from recent high
+        bars_from_bump_high = ta.barssince(high == ta.highest(high, 30))
+        price_below_bump    = close < ta.highest(high, 30) * 0.95  // 5% below bump peak
+        is_run_phase        = bars_from_bump_high >= 2 and price_below_bump
+
+        // ── BULLISH BARR (Bump-and-Run Reversal) at high ──────────────────
+        bearish_barr = is_gentle_uptrend and is_steep_bump and vol_expand and is_run_phase
+
+        // ── BEARISH BARR (Inverted - Dump-and-Run) ────────────────────────
+        lead_in_low_start = ta.lowest(low, lead_in_len)[lead_in_len]
+        lead_in_low_end   = ta.lowest(low, 5)
+        lead_in_slope_dn  = (lead_in_low_start - lead_in_low_end) / lead_in_len
+
+        bump_low_start  = ta.lowest(low, min_bump_bars)[min_bump_bars]
+        bump_low_end    = low
+        bump_slope_dn   = (bump_low_start - bump_low_end) / min_bump_bars
+
+        is_gentle_dn    = lead_in_slope_dn > 0 and
+                         lead_in_slope_dn < (lead_in_low_start * 0.005)
+        is_steep_dn     = lead_in_slope_dn != 0 and
+                         bump_slope_dn > (math.abs(lead_in_slope_dn) * bump_threshold)
+
+        bars_from_dump_low = ta.barssince(low == ta.lowest(low, 30))
+        price_above_dump   = close > ta.lowest(low, 30) * 1.05
+        is_run_up          = bars_from_dump_low >= 2 and price_above_dump
+
+        bullish_barr = is_gentle_dn and is_steep_dn and vol_expand and is_run_up
+
+        // ── VISUALIZE ─────────────────────────────────────────────────────
+        if bearish_barr
+            label.new(bar_index, high, "BARR ▼\nBump-Run",
+                     style=label.style_label_down,
+                     color=color.new(color.orange, 0),
+                     textcolor=color.white,
+                     size=size.normal,
+                     tooltip="Bump-and-Run Reversal (Bearish)\nLead-in → Steep Bump → Run Down\n55% success rate (Bulkowski)\nEducational Pattern - NOT a trading signal")
+
+            // Draw lead-in trendline projection
+            line.new(bar_index - lead_in_len, lead_in_high_start, bar_index, lead_in_high_end,
+                    color=color.new(color.orange, 30),
+                    width=1,
+                    style=line.style_dashed)
+
+        if bullish_barr
+            label.new(bar_index, low, "BARR ▲\nDump-Run",
+                     style=label.style_label_up,
+                     color=color.new(color.teal, 0),
+                     textcolor=color.white,
+                     size=size.normal,
+                     tooltip="Bump-and-Run Reversal (Bullish / Inverted)\nLead-in → Steep Dump → Run Up\n55% success rate (Bulkowski)\nEducational Pattern - NOT a trading signal")
+
+            line.new(bar_index - lead_in_len, lead_in_low_start, bar_index, lead_in_low_end,
+                    color=color.new(color.teal, 30),
+                    width=1,
+                    style=line.style_dashed)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VII-D. WAVE FAILURE CLASSIFICATIONS (Glen Neely NEoWave - 8 Types)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Elliott/NEoWave Wave Failure Classifications
+// 8 types based on B-wave and C-wave behavior in corrective structures
+// Source: Glen Neely "Mastering Elliott Wave" Ch.6 - Flat Formations
+f_detect_wave_failures() =>
+    if show_elliott and array.size(zz_price) >= 5 and barstate.isconfirmed
+        size = array.size(zz_price)
+
+        // ABC Corrective wave structure
+        // Wave A: p0 → p1 (first corrective move)
+        // Wave B: p1 → p2 (retracement of A)
+        // Wave C: p2 → p3 (final corrective move)
+        p0 = array.get(zz_price, size - 5)
+        p1 = array.get(zz_price, size - 4)  // End of A
+        p2 = array.get(zz_price, size - 3)  // End of B
+        p3 = array.get(zz_price, size - 2)  // End of C
+        p4 = array.get(zz_price, size - 1)  // Next pivot
+
+        b0 = array.get(zz_bar, size - 5)
+        b1 = array.get(zz_bar, size - 4)
+        b2 = array.get(zz_bar, size - 3)
+        b3 = array.get(zz_bar, size - 2)
+
+        d0 = array.get(zz_direction, size - 5)
+
+        // Only analyse flat-type corrections (A and C same direction as overall)
+        is_bearish_correction = d0 == 1  // A wave down
+        is_bullish_correction = d0 == -1 // A wave up
+
+        if is_bearish_correction
+            // Bearish correction: p0 (high) → p1 (low) = Wave A
+            wave_a = p0 - p1  // Wave A size (positive = down)
+            wave_b = p2 - p1  // Wave B size (positive = up)
+            wave_c = p2 - p3  // Wave C size (positive = down)
+
+            // Ratios (NEoWave classification rules)
+            b_vs_a  = wave_a != 0 ? wave_b / wave_a : 0
+            c_vs_a  = wave_a != 0 ? wave_c / wave_a : 0
+            b_reach_a_start = p2 >= p0  // B exceeds A's start (origin)
+
+            // Classification logic:
+            // 1. Common Flat:      B ≥ 61.8%A and B < A's start, C ≈ 100% A
+            // 2. Elongated Flat:   B > A's start (B exceeds origin), C ≈ 100-160% A
+            // 3. C-Failure:        C fails to reach A's end (C < 100% A, B normal)
+            // 4. B-Failure:        B < 61.8% A (weak B wave)
+            // 5. Double Failure:   B < 61.8% A AND C < 100% A
+            // 6. Running Flat:     B > A's start, C barely exceeds A's end downward
+            // 7. Irregular:        B > A's start, C > A's end significantly (most common)
+            // 8. Running Irregular: B >> A's start, C >> A's end
+
+            pattern_name = ""
+            pattern_color = color.gray
+            tooltip_text = ""
+
+            if b_vs_a >= 0.618 and not b_reach_a_start and c_vs_a >= 0.9 and c_vs_a <= 1.1
+                pattern_name = "Common Flat"
+                pattern_color := color.new(color.blue, 0)
+                tooltip_text := "Common Flat (NEoWave)\nB ≥ 61.8% of A, B < A's start\nC ≈ 100% of A\nMost balanced correction type"
+
+            else if b_reach_a_start and c_vs_a >= 0.9 and c_vs_a <= 1.6
+                pattern_name := "Elongated Flat"
+                pattern_color := color.new(color.navy, 0)
+                tooltip_text := "Elongated Flat (NEoWave)\nB exceeds A's starting point\nC ≈ 100–160% of A\nModerate extension"
+
+            else if b_vs_a >= 0.618 and not b_reach_a_start and c_vs_a < 0.9
+                pattern_name := "C-Failure"
+                pattern_color := color.new(color.yellow, 0)
+                tooltip_text := "C-Failure Flat (NEoWave)\nNormal B wave\nC fails to reach A's end\nSignals strong opposing trend"
+
+            else if b_vs_a < 0.618 and not b_reach_a_start and c_vs_a >= 0.9
+                pattern_name := "B-Failure"
+                pattern_color := color.new(color.orange, 0)
+                tooltip_text := "B-Failure Flat (NEoWave)\nB wave less than 61.8% of A\nWeak retracement phase\nStrong continuation expected"
+
+            else if b_vs_a < 0.618 and c_vs_a < 0.9
+                pattern_name := "Double Failure"
+                pattern_color := color.new(color.red, 0)
+                tooltip_text := "Double Failure (NEoWave)\nBOTH B and C waves fail\nExtremely strong continuation signal\nRare but powerful pattern"
+
+            else if b_reach_a_start and c_vs_a >= 0.9 and c_vs_a <= 1.05
+                pattern_name := "Running Flat"
+                pattern_color := color.new(color.purple, 0)
+                tooltip_text := "Running Flat (NEoWave)\nB beyond A's start\nC barely exceeds A's end\nMarket very strong against correction"
+
+            else if b_reach_a_start and c_vs_a > 1.05 and c_vs_a <= 1.618
+                pattern_name := "Irregular"
+                pattern_color := color.new(color.fuchsia, 0)
+                tooltip_text := "Irregular Flat (NEoWave)\nB beyond A's start\nC extends significantly past A's end\nMost common flat variant"
+
+            else if b_reach_a_start and c_vs_a > 1.618
+                pattern_name := "Running Irregular"
+                pattern_color := color.new(color.maroon, 0)
+                tooltip_text := "Running Irregular (NEoWave)\nB well beyond A's start\nC extends > 161.8% of A\nVery strong trend continuation"
+
+            if pattern_name != ""
+                label.new(b3, p3, pattern_name,
+                         style=label.style_label_up,
+                         color=pattern_color,
+                         textcolor=color.white,
+                         size=size.small,
+                         tooltip=tooltip_text + "\n\nB/A ratio: " + str.tostring(b_vs_a, "#.###") +
+                                "\nC/A ratio: " + str.tostring(c_vs_a, "#.###") +
+                                "\nEducational - Glen Neely NEoWave")
+
+                // Draw connecting lines for ABC
+                line.new(b0, p0, b1, p1, color=color.new(pattern_color, 30), width=1)
+                line.new(b1, p1, b2, p2, color=color.new(pattern_color, 30), width=1,
+                        style=line.style_dashed)
+                line.new(b2, p2, b3, p3, color=color.new(pattern_color, 30), width=1)
+
+        if is_bullish_correction
+            // Bullish correction: p0 (low) → p1 (high) = Wave A up
+            wave_a = p1 - p0
+            wave_b = p1 - p2
+            wave_c = p3 - p2
+
+            b_vs_a  = wave_a != 0 ? wave_b / wave_a : 0
+            c_vs_a  = wave_a != 0 ? wave_c / wave_a : 0
+            b_reach_a_start = p2 <= p0
+
+            pattern_name = ""
+            pattern_color = color.gray
+            tooltip_text = ""
+
+            if b_vs_a >= 0.618 and not b_reach_a_start and c_vs_a >= 0.9 and c_vs_a <= 1.1
+                pattern_name := "Common Flat ▲"
+                pattern_color := color.new(color.blue, 0)
+                tooltip_text := "Common Flat Bullish (NEoWave)\nSymmetric correction\nExpect continuation up"
+
+            else if b_reach_a_start and c_vs_a >= 0.9 and c_vs_a <= 1.6
+                pattern_name := "Elongated ▲"
+                pattern_color := color.new(color.navy, 0)
+                tooltip_text := "Elongated Flat Bullish (NEoWave)\nB exceeds A start (deep retracement)\nExtended correction"
+
+            else if b_vs_a >= 0.618 and not b_reach_a_start and c_vs_a < 0.9
+                pattern_name := "C-Fail ▲"
+                pattern_color := color.new(color.yellow, 0)
+                tooltip_text := "C-Failure Flat Bullish (NEoWave)\nC fails to reach A's end\nVery strong uptrend signal"
+
+            else if b_vs_a < 0.618 and not b_reach_a_start and c_vs_a >= 0.9
+                pattern_name := "B-Fail ▲"
+                pattern_color := color.new(color.orange, 0)
+                tooltip_text := "B-Failure Flat Bullish (NEoWave)\nWeak B wave (< 61.8% of A)\nStrong upward continuation"
+
+            else if b_vs_a < 0.618 and c_vs_a < 0.9
+                pattern_name := "Dbl Fail ▲"
+                pattern_color := color.new(color.red, 0)
+                tooltip_text := "Double Failure Bullish (NEoWave)\nBoth B and C fail\nExtremely strong upward continuation"
+
+            else if b_reach_a_start and c_vs_a >= 0.9 and c_vs_a <= 1.05
+                pattern_name := "Running ▲"
+                pattern_color := color.new(color.purple, 0)
+                tooltip_text := "Running Flat Bullish (NEoWave)\nB deep, C barely completes\nMarket extremely strong"
+
+            else if b_reach_a_start and c_vs_a > 1.05 and c_vs_a <= 1.618
+                pattern_name := "Irregular ▲"
+                pattern_color := color.new(color.fuchsia, 0)
+                tooltip_text := "Irregular Flat Bullish (NEoWave)\nMost common flat type up"
+
+            else if b_reach_a_start and c_vs_a > 1.618
+                pattern_name := "Run Irr ▲"
+                pattern_color := color.new(color.maroon, 0)
+                tooltip_text := "Running Irregular Bullish (NEoWave)\nVery strong upward continuation"
+
+            if pattern_name != ""
+                label.new(b3, p3, pattern_name,
+                         style=label.style_label_down,
+                         color=pattern_color,
+                         textcolor=color.white,
+                         size=size.small,
+                         tooltip=tooltip_text + "\n\nB/A ratio: " + str.tostring(b_vs_a, "#.###") +
+                                "\nC/A ratio: " + str.tostring(c_vs_a, "#.###") +
+                                "\nEducational - Glen Neely NEoWave")
+
+                line.new(b0, p0, b1, p1, color=color.new(pattern_color, 30), width=1)
+                line.new(b1, p1, b2, p2, color=color.new(pattern_color, 30), width=1,
+                        style=line.style_dashed)
+                line.new(b2, p2, b3, p3, color=color.new(pattern_color, 30), width=1)
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // VIII. DOW THEORY DETECTION (다우 이론 탐지)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2909,8 +3347,19 @@ if barstate.islast or barstate.isrealtime
     f_detect_shark_advanced()
     f_detect_alternate_bat()
 
-    // Wyckoff
+    // BAMM Patterns (Bad Action Magnet Move - Scott Carney Vol 2/3)
+    f_detect_bamm()
+    f_detect_rsi_bamm()
+
+    // Wyckoff (Phase Detection + 9 Buying/Selling Tests)
     f_detect_wyckoff()
+    f_detect_wyckoff_9_tests()
+
+    // Chart Patterns - Bump-and-Run Reversal (Bulkowski)
+    f_detect_bump_and_run()
+
+// Wave Failure Classifications (NEoWave - Glen Neely 8 Types)
+f_detect_wave_failures()
 
 // Dow Theory (runs on every bar for table update)
 f_detect_dow_theory()
