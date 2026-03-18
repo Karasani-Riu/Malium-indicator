@@ -1706,6 +1706,151 @@ f_detect_alternate_bat() =>
             label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color.orange, size=size.normal)
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VI-B. BAMM PATTERN DETECTION (Bad Action Magnet Move - Scott Carney Vol 2/3)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Detect BAMM Pattern (Bad Action Magnet Move)
+// BAMM occurs near harmonic PRZ with extreme spike followed by quick reversal
+f_detect_bamm() =>
+    if show_harmonic and barstate.isconfirmed
+        // BAMM characteristics:
+        // 1. 2-4 bar extreme spike (Bad Action)
+        // 2. Near harmonic pattern PRZ zone
+        // 3. High volume spike
+        // 4. Quick reversal (Magnet Move back)
+
+        // Calculate recent price action
+        current_high = high
+        current_low = low
+        current_close = close
+        current_volume = volume
+
+        // Look for 2-4 bar spike
+        lookback = 4
+        max_high = ta.highest(high, lookback)
+        min_low = ta.lowest(low, lookback)
+        avg_volume = ta.sma(volume, 20)
+
+        // Detect bullish BAMM (downward spike then reversal)
+        spike_down = (current_low == min_low) and (close > low)
+        spike_range = (max_high - min_low) / min_low
+        volume_spike = current_volume > avg_volume * 1.5
+
+        // Check if we're near a potential PRZ (using ATR as proxy)
+        atr = ta.atr(14)
+        potential_prz = spike_range > (atr / close * 2)  // Spike is at least 2x ATR
+
+        // Detect reversal (price moving away from spike low)
+        bars_since_low = ta.barssince(current_low == min_low)
+        reversal_strength = (close - min_low) / (max_high - min_low)
+        strong_reversal = reversal_strength > 0.5 and bars_since_low <= 2
+
+        // Bullish BAMM confirmation
+        bullish_bamm = spike_down and potential_prz and volume_spike and strong_reversal
+
+        if bullish_bamm
+            label.new(bar_index, low, "BAMM ▲",
+                     style=label.style_label_up,
+                     color=color.new(color.fuchsia, 0),
+                     textcolor=color.white,
+                     size=size.normal,
+                     tooltip="Bad Action Magnet Move\nExtreme spike with quick reversal\nEducational pattern - Scott Carney")
+
+            // Draw spike range box
+            box.new(bar_index - lookback, min_low, bar_index, max_high,
+                   border_color=color.new(color.fuchsia, 50),
+                   bgcolor=color.new(color.fuchsia, 90),
+                   border_width=1)
+
+        // Detect bearish BAMM (upward spike then reversal)
+        spike_up = (current_high == max_high) and (close < high)
+        bearish_reversal_strength = (max_high - close) / (max_high - min_low)
+        bearish_strong_reversal = bearish_reversal_strength > 0.5 and ta.barssince(current_high == max_high) <= 2
+
+        bearish_bamm = spike_up and potential_prz and volume_spike and bearish_strong_reversal
+
+        if bearish_bamm
+            label.new(bar_index, high, "BAMM ▼",
+                     style=label.style_label_down,
+                     color=color.new(color.fuchsia, 0),
+                     textcolor=color.white,
+                     size=size.normal,
+                     tooltip="Bad Action Magnet Move\nExtreme spike with quick reversal\nEducational pattern - Scott Carney")
+
+            // Draw spike range box
+            box.new(bar_index - lookback, min_low, bar_index, max_high,
+                   border_color=color.new(color.fuchsia, 50),
+                   bgcolor=color.new(color.fuchsia, 90),
+                   border_width=1)
+
+// Detect RSI BAMM (RSI + BAMM Combined)
+// Enhanced BAMM with RSI extreme confirmation
+f_detect_rsi_bamm() =>
+    if show_harmonic and barstate.isconfirmed
+        // Calculate RSI
+        rsi = ta.rsi(close, 14)
+        rsi_prev = ta.rsi(close[1], 14)
+
+        // RSI extremes
+        rsi_oversold = 30
+        rsi_overbought = 70
+
+        // Trigger Bar: RSI reaches extreme
+        trigger_bullish = rsi <= rsi_oversold or rsi[1] <= rsi_oversold
+        trigger_bearish = rsi >= rsi_overbought or rsi[1] >= rsi_overbought
+
+        // BAMM spike detection (same as regular BAMM)
+        lookback = 4
+        max_high = ta.highest(high, lookback)
+        min_low = ta.lowest(low, lookback)
+        avg_volume = ta.sma(volume, 20)
+        current_volume = volume
+
+        spike_down = (low == min_low) and (close > low)
+        spike_up = (high == max_high) and (close < high)
+        volume_spike = current_volume > avg_volume * 1.5
+
+        // RSI recovery (Confirmation Point)
+        rsi_recovering_up = rsi > rsi[1] and rsi[1] > rsi[2]  // RSI rising
+        rsi_recovering_down = rsi < rsi[1] and rsi[1] < rsi[2]  // RSI falling
+
+        // Bullish RSI BAMM
+        bullish_rsi_bamm = trigger_bullish and spike_down and volume_spike and rsi_recovering_up
+
+        if bullish_rsi_bamm
+            label.new(bar_index, low, "RSI BAMM ▲\nRSI:" + str.tostring(rsi, "#.#"),
+                     style=label.style_label_up,
+                     color=color.new(color.purple, 0),
+                     textcolor=color.white,
+                     size=size.large,
+                     tooltip="RSI BAMM - Extreme Bullish Signal\nRSI Oversold + Spike + Recovery\nEducational pattern - Scott Carney Vol 2")
+
+            // Draw RSI level line
+            line.new(bar_index - 5, low, bar_index + 5, low,
+                    color=color.new(color.purple, 30),
+                    width=2,
+                    style=line.style_dashed,
+                    extend=extend.none)
+
+        // Bearish RSI BAMM
+        bearish_rsi_bamm = trigger_bearish and spike_up and volume_spike and rsi_recovering_down
+
+        if bearish_rsi_bamm
+            label.new(bar_index, high, "RSI BAMM ▼\nRSI:" + str.tostring(rsi, "#.#"),
+                     style=label.style_label_down,
+                     color=color.new(color.purple, 0),
+                     textcolor=color.white,
+                     size=size.large,
+                     tooltip="RSI BAMM - Extreme Bearish Signal\nRSI Overbought + Spike + Recovery\nEducational pattern - Scott Carney Vol 2")
+
+            // Draw RSI level line
+            line.new(bar_index - 5, high, bar_index + 5, high,
+                    color=color.new(color.purple, 30),
+                    width=2,
+                    style=line.style_dashed,
+                    extend=extend.none)
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // VII. WYCKOFF PATTERN DETECTION (와이코프 패턴 탐지)
 // ═══════════════════════════════════════════════════════════════════════════════
 
