@@ -90,19 +90,55 @@ cylinder_breakout_volume_mult = input.float(1.5, title="Breakout Volume Multipli
 
 // --- Color Settings ---
 var group_colors = "Color Settings"
-color_impulse = input.color(color.new(color.blue, 0), title="Impulse Wave Color", group=group_colors)
-color_corrective = input.color(color.new(color.red, 0), title="Corrective Wave Color", group=group_colors)
-color_harmonic = input.color(color.new(color.purple, 0), title="Harmonic Pattern Color", group=group_colors)
+
+// Directional Colors (Bullish vs Bearish) - Default Standard
+color_bullish_harmonic = input.color(color.new(color.green, 0), title="Bullish Harmonic Pattern Color", group=group_colors, tooltip="Default color for bullish/upward reversal harmonic patterns")
+color_bearish_harmonic = input.color(color.new(color.red, 0), title="Bearish Harmonic Pattern Color", group=group_colors, tooltip="Default color for bearish/downward reversal harmonic patterns")
+
+color_bullish_wave = input.color(color.new(color.green, 0), title="Bullish Elliott Wave Color", group=group_colors, tooltip="Default color for bullish/upward Elliott waves")
+color_bearish_wave = input.color(color.new(color.red, 0), title="Bearish Elliott Wave Color", group=group_colors, tooltip="Default color for bearish/downward Elliott waves")
+
+color_bullish_chart_pattern = input.color(color.new(color.green, 0), title="Bullish Chart Pattern Color", group=group_colors, tooltip="Default color for bullish chart patterns")
+color_bearish_chart_pattern = input.color(color.new(color.red, 0), title="Bearish Chart Pattern Color", group=group_colors, tooltip="Default color for bearish chart patterns")
+
+color_bullish_neowave = input.color(color.new(color.green, 0), title="Bullish NEoWave Color", group=group_colors, tooltip="Default color for bullish NEoWave patterns")
+color_bearish_neowave = input.color(color.new(color.red, 0), title="Bearish NEoWave Color", group=group_colors, tooltip="Default color for bearish NEoWave patterns")
+
+// Individual Pattern/Wave Label Colors (User Customizable)
+var group_label_colors = "Individual Label Colors"
+color_gartley_label = input.color(color.new(color.purple, 0), title="Gartley Label Color", group=group_label_colors)
+color_butterfly_label = input.color(color.new(color.purple, 0), title="Butterfly Label Color", group=group_label_colors)
+color_bat_label = input.color(color.new(color.purple, 0), title="Bat Label Color", group=group_label_colors)
+color_crab_label = input.color(color.new(color.purple, 0), title="Crab Label Color", group=group_label_colors)
+color_shark_label = input.color(color.new(color.purple, 0), title="Shark Label Color", group=group_label_colors)
+color_cypher_label = input.color(color.new(color.purple, 0), title="Cypher Label Color", group=group_label_colors)
+color_deep_crab_label = input.color(color.new(color.purple, 0), title="Deep Crab Label Color", group=group_label_colors)
+color_5_0_label = input.color(color.new(color.purple, 0), title="5-0 Pattern Label Color", group=group_label_colors)
+color_alt_bat_label = input.color(color.new(color.purple, 0), title="Alternate Bat Label Color", group=group_label_colors)
+color_three_drives_label = input.color(color.new(color.purple, 0), title="Three Drives Label Color", group=group_label_colors)
+color_abcd_label = input.color(color.new(color.purple, 0), title="AB=CD Label Color", group=group_label_colors)
+color_bamm_label = input.color(color.new(color.orange, 0), title="BAMM Label Color", group=group_label_colors)
+color_impulse_label = input.color(color.new(color.blue, 0), title="Impulse Wave Label Color", group=group_label_colors)
+color_corrective_label = input.color(color.new(color.fuchsia, 0), title="Corrective Wave Label Color", group=group_label_colors)
+color_neowave_label = input.color(color.new(color.fuchsia, 0), title="NEoWave Label Color", group=group_label_colors)
+color_chart_pattern_label = input.color(color.new(color.aqua, 0), title="Chart Pattern Label Color", group=group_label_colors)
+
+// Legacy Colors (Other Patterns)
 color_wyckoff = input.color(color.new(color.orange, 0), title="Wyckoff Color", group=group_colors)
-color_dow = input.color(color.new(color.green, 0), title="Dow Theory Color", group=group_colors)
+color_dow = input.color(color.new(color.blue, 0), title="Dow Theory Color", group=group_colors)
 color_master_contraction = input.color(color.new(color.yellow, 80), title="Master Pattern Contraction", group=group_colors)
 color_master_expansion = input.color(color.new(color.purple, 0), title="Master Pattern Expansion", group=group_colors)
 color_master_trend = input.color(color.new(color.teal, 0), title="Master Pattern Trend", group=group_colors)
 color_kondratiev = input.color(color.new(color.navy, 0), title="Kondratiev Wave Color", group=group_colors)
 color_deep_cycle = input.color(color.new(color.maroon, 0), title="Deep Depth Cycle Color", group=group_colors)
 color_livermore = input.color(color.new(color.olive, 70), title="Livermore Cylinder Color", group=group_colors)
-color_neowave = input.color(color.new(color.fuchsia, 0), title="NEoWave Advanced Pattern Color", group=group_colors)
-color_chart_pattern = input.color(color.new(color.aqua, 0), title="Chart Pattern Color", group=group_colors)
+
+// Backward compatibility (will be replaced by directional colors in pattern functions)
+color_harmonic = color.new(color.purple, 0)
+color_impulse = color.new(color.blue, 0)
+color_corrective = color.new(color.red, 0)
+color_neowave = color.new(color.fuchsia, 0)
+color_chart_pattern = color.new(color.aqua, 0)
 
 // --- Advanced Settings ---
 var group_advanced = "Advanced Settings"
@@ -385,30 +421,33 @@ f_detect_major_impulse() =>
                 if not na(array.get(major_impulse_labels, i))
                     label.delete(array.get(major_impulse_labels, i))
 
+            // Directional color based on wave direction
+            wave_color = is_bullish ? color_bullish_wave : color_bearish_wave
+
             // Draw major impulse lines (bold, last wave is dashed for live update)
-            array.set(major_impulse_lines, 0, line.new(b0, p0, b1, p1, color=color_impulse, width=3, style=line.style_solid))
-            array.set(major_impulse_lines, 1, line.new(b1, p1, b2, p2, color=color_impulse, width=3, style=line.style_solid))
-            array.set(major_impulse_lines, 2, line.new(b2, p2, b3, p3, color=color_impulse, width=3, style=line.style_solid))
-            array.set(major_impulse_lines, 3, line.new(b3, p3, b4, p4, color=color_impulse, width=3, style=line.style_solid))
-            array.set(major_impulse_lines, 4, line.new(b4, p4, b5, p5, color=color_impulse, width=3, style=line.style_dashed))  // Last wave: dashed
+            array.set(major_impulse_lines, 0, line.new(b0, p0, b1, p1, color=wave_color, width=3, style=line.style_solid))
+            array.set(major_impulse_lines, 1, line.new(b1, p1, b2, p2, color=wave_color, width=3, style=line.style_solid))
+            array.set(major_impulse_lines, 2, line.new(b2, p2, b3, p3, color=wave_color, width=3, style=line.style_solid))
+            array.set(major_impulse_lines, 3, line.new(b3, p3, b4, p4, color=wave_color, width=3, style=line.style_solid))
+            array.set(major_impulse_lines, 4, line.new(b4, p4, b5, p5, color=wave_color, width=3, style=line.style_dashed))  // Last wave: dashed
 
             // Major wave labels (bold Arabic numerals, far from candles)
             label_offset_major = atr_value * label_offset_multiplier * 3.0
             array.set(major_impulse_labels, 0, label.new(b1, is_bullish ? p1 - label_offset_major : p1 + label_offset_major,
                      "1", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.large, textalign=text.align_center))
+                     textcolor=color_impulse_label, size=size.large, textalign=text.align_center))
             array.set(major_impulse_labels, 1, label.new(b2, is_bullish ? p2 + label_offset_major : p2 - label_offset_major,
                      "2", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.large, textalign=text.align_center))
+                     textcolor=color_impulse_label, size=size.large, textalign=text.align_center))
             array.set(major_impulse_labels, 2, label.new(b3, is_bullish ? p3 - label_offset_major : p3 + label_offset_major,
                      "3", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.large, textalign=text.align_center))
+                     textcolor=color_impulse_label, size=size.large, textalign=text.align_center))
             array.set(major_impulse_labels, 3, label.new(b4, is_bullish ? p4 + label_offset_major : p4 - label_offset_major,
                      "4", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.large, textalign=text.align_center))
+                     textcolor=color_impulse_label, size=size.large, textalign=text.align_center))
             array.set(major_impulse_labels, 4, label.new(b5, is_bullish ? p5 - label_offset_major : p5 + label_offset_major,
                      "5?", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color.new(color_impulse, 50), size=size.large, textalign=text.align_center))  // "5?" for uncertain last wave
+                     textcolor=color.new(color_impulse_label, 50), size=size.large, textalign=text.align_center))  // "5?" for uncertain last wave
 
             // ═══════════════════════════════════════════════════════════════════════
             // ELLIOTT WAVE ALTERNATION RULE (Visual Guide to Elliott Wave Trading)
@@ -519,6 +558,9 @@ f_detect_major_corrective() =>
         d0 = array.get(major_zz_direction, size - 4)
         is_bullish = d0 == 1  // Corrective after uptrend
 
+        // Directional color based on wave direction
+        wave_color = is_bullish ? color_bearish_wave : color_bullish_wave  // Reversed because corrections go opposite direction
+
         // ABC pattern validation
         wave_a = math.abs(p1 - p0)
         wave_b = math.abs(p2 - p1)
@@ -536,21 +578,21 @@ f_detect_major_corrective() =>
                     label.delete(array.get(major_corrective_labels, i))
 
             // Draw major corrective lines (last wave C is dashed for live update)
-            array.set(major_corrective_lines, 0, line.new(b0, p0, b1, p1, color=color_corrective, width=3, style=line.style_solid))
-            array.set(major_corrective_lines, 1, line.new(b1, p1, b2, p2, color=color_corrective, width=3, style=line.style_solid))
-            array.set(major_corrective_lines, 2, line.new(b2, p2, b3, p3, color=color_corrective, width=3, style=line.style_dashed))  // Last wave: dashed
+            array.set(major_corrective_lines, 0, line.new(b0, p0, b1, p1, color=wave_color, width=3, style=line.style_solid))
+            array.set(major_corrective_lines, 1, line.new(b1, p1, b2, p2, color=wave_color, width=3, style=line.style_solid))
+            array.set(major_corrective_lines, 2, line.new(b2, p2, b3, p3, color=wave_color, width=3, style=line.style_dashed))  // Last wave: dashed
 
             // Major corrective labels (bold uppercase, far from candles)
             label_offset_major = atr_value * label_offset_multiplier * 3.0
             array.set(major_corrective_labels, 0, label.new(b1, is_bullish ? p1 + label_offset_major : p1 - label_offset_major,
                      "A", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_corrective, size=size.large, textalign=text.align_center))
+                     textcolor=color_corrective_label, size=size.large, textalign=text.align_center))
             array.set(major_corrective_labels, 1, label.new(b2, is_bullish ? p2 - label_offset_major : p2 + label_offset_major,
                      "B", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_corrective, size=size.large, textalign=text.align_center))
+                     textcolor=color_corrective_label, size=size.large, textalign=text.align_center))
             array.set(major_corrective_labels, 2, label.new(b3, is_bullish ? p3 + label_offset_major : p3 - label_offset_major,
                      "C?", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color.new(color_corrective, 50), size=size.large, textalign=text.align_center))  // "C?" for uncertain last wave
+                     textcolor=color.new(color_corrective_label, 50), size=size.large, textalign=text.align_center))  // "C?" for uncertain last wave
 
 // Detect Minor Impulse Waves (소파동 임펄스: i, ii, iii, iv, v)
 f_detect_minor_impulse() =>
@@ -575,6 +617,9 @@ f_detect_minor_impulse() =>
         d0 = array.get(minor_zz_direction, size - 6)
         is_bullish = d0 == -1
 
+        // Directional color based on wave direction
+        wave_color = is_bullish ? color_bullish_wave : color_bearish_wave
+
         // Sub-wave validation
         wave1 = math.abs(p1 - p0)
         wave2 = math.abs(p2 - p1)
@@ -596,29 +641,29 @@ f_detect_minor_impulse() =>
                     label.delete(array.get(minor_impulse_labels, i))
 
             // Draw minor impulse lines (thin, last wave is dashed for live update)
-            array.set(minor_impulse_lines, 0, line.new(b0, p0, b1, p1, color=color_impulse, width=1, style=line.style_dotted))
-            array.set(minor_impulse_lines, 1, line.new(b1, p1, b2, p2, color=color_impulse, width=1, style=line.style_dotted))
-            array.set(minor_impulse_lines, 2, line.new(b2, p2, b3, p3, color=color_impulse, width=1, style=line.style_dotted))
-            array.set(minor_impulse_lines, 3, line.new(b3, p3, b4, p4, color=color_impulse, width=1, style=line.style_dotted))
-            array.set(minor_impulse_lines, 4, line.new(b4, p4, b5, p5, color=color_impulse, width=1, style=line.style_dashed))  // Last wave: more dashed
+            array.set(minor_impulse_lines, 0, line.new(b0, p0, b1, p1, color=wave_color, width=1, style=line.style_dotted))
+            array.set(minor_impulse_lines, 1, line.new(b1, p1, b2, p2, color=wave_color, width=1, style=line.style_dotted))
+            array.set(minor_impulse_lines, 2, line.new(b2, p2, b3, p3, color=wave_color, width=1, style=line.style_dotted))
+            array.set(minor_impulse_lines, 3, line.new(b3, p3, b4, p4, color=wave_color, width=1, style=line.style_dotted))
+            array.set(minor_impulse_lines, 4, line.new(b4, p4, b5, p5, color=wave_color, width=1, style=line.style_dashed))  // Last wave: more dashed
 
             // Minor wave labels (lowercase Roman numerals, close to candles)
             label_offset_minor = atr_value * label_offset_multiplier * 0.5
             array.set(minor_impulse_labels, 0, label.new(b1, is_bullish ? p1 - label_offset_minor : p1 + label_offset_minor,
                      "i", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center))
+                     textcolor=color_impulse_label, size=size.tiny, textalign=text.align_center))
             array.set(minor_impulse_labels, 1, label.new(b2, is_bullish ? p2 + label_offset_minor : p2 - label_offset_minor,
                      "ii", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center))
+                     textcolor=color_impulse_label, size=size.tiny, textalign=text.align_center))
             array.set(minor_impulse_labels, 2, label.new(b3, is_bullish ? p3 - label_offset_minor : p3 + label_offset_minor,
                      "iii", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center))
+                     textcolor=color_impulse_label, size=size.tiny, textalign=text.align_center))
             array.set(minor_impulse_labels, 3, label.new(b4, is_bullish ? p4 + label_offset_minor : p4 - label_offset_minor,
                      "iv", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_impulse, size=size.tiny, textalign=text.align_center))
+                     textcolor=color_impulse_label, size=size.tiny, textalign=text.align_center))
             array.set(minor_impulse_labels, 4, label.new(b5, is_bullish ? p5 - label_offset_minor : p5 + label_offset_minor,
                      "v?", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color.new(color_impulse, 50), size=size.tiny, textalign=text.align_center))  // "v?" for uncertain last wave
+                     textcolor=color.new(color_impulse_label, 50), size=size.tiny, textalign=text.align_center))  // "v?" for uncertain last wave
 
             // Elliott Wave enhancements for minor waves
             if show_alternation
@@ -640,7 +685,7 @@ f_detect_minor_impulse() =>
                 price_02 = p2 - p0
                 slope = bars_02 != 0 ? price_02 / bars_02 : 0
 
-                line.new(b0, p0, b2, p2, color=color.new(color_impulse, 70),
+                line.new(b0, p0, b2, p2, color=color.new(wave_color, 70),
                          width=1, style=line.style_dotted, extend=extend.right)
 
                 bars_to_5 = b5 - b0
@@ -648,7 +693,7 @@ f_detect_minor_impulse() =>
                 parallel_offset = p1 - (p0 + (slope * (b1 - b0)))
                 channel_parallel = channel_target + parallel_offset
 
-                line.new(b1, p1, b5, channel_parallel, color=color.new(color_impulse, 70),
+                line.new(b1, p1, b5, channel_parallel, color=color.new(wave_color, 70),
                          width=1, style=line.style_dotted, extend=extend.right)
 
             if show_extension_labels
@@ -659,7 +704,7 @@ f_detect_minor_impulse() =>
                 if wave3_extended
                     label.new(b3, is_bullish ? p3 - label_offset_minor * 2 : p3 + label_offset_minor * 2,
                              "iii Ext", style=label.style_none,
-                             textcolor=color.new(color_impulse, 40), size=size.tiny)
+                             textcolor=color.new(color_impulse_label, 40), size=size.tiny)
 
 // Detect Minor Corrective Waves (소파동 조정: a, b, c)
 f_detect_minor_corrective() =>
@@ -680,6 +725,9 @@ f_detect_minor_corrective() =>
         d0 = array.get(minor_zz_direction, size - 4)
         is_bullish = d0 == 1
 
+        // Directional color based on wave direction
+        wave_color = is_bullish ? color_bearish_wave : color_bullish_wave  // Reversed because corrections go opposite direction
+
         // abc pattern validation
         wave_a = math.abs(p1 - p0)
         wave_b = math.abs(p2 - p1)
@@ -697,21 +745,21 @@ f_detect_minor_corrective() =>
                     label.delete(array.get(minor_corrective_labels, i))
 
             // Draw minor corrective lines (last wave c is dashed for live update)
-            array.set(minor_corrective_lines, 0, line.new(b0, p0, b1, p1, color=color_corrective, width=1, style=line.style_dotted))
-            array.set(minor_corrective_lines, 1, line.new(b1, p1, b2, p2, color=color_corrective, width=1, style=line.style_dotted))
-            array.set(minor_corrective_lines, 2, line.new(b2, p2, b3, p3, color=color_corrective, width=1, style=line.style_dashed))  // Last wave: more dashed
+            array.set(minor_corrective_lines, 0, line.new(b0, p0, b1, p1, color=wave_color, width=1, style=line.style_dotted))
+            array.set(minor_corrective_lines, 1, line.new(b1, p1, b2, p2, color=wave_color, width=1, style=line.style_dotted))
+            array.set(minor_corrective_lines, 2, line.new(b2, p2, b3, p3, color=wave_color, width=1, style=line.style_dashed))  // Last wave: more dashed
 
             // Minor corrective labels (lowercase letters, close to candles)
             label_offset_minor = atr_value * label_offset_multiplier * 0.5
             array.set(minor_corrective_labels, 0, label.new(b1, is_bullish ? p1 + label_offset_minor : p1 - label_offset_minor,
                      "a", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_corrective, size=size.tiny, textalign=text.align_center))
+                     textcolor=color_corrective_label, size=size.tiny, textalign=text.align_center))
             array.set(minor_corrective_labels, 1, label.new(b2, is_bullish ? p2 - label_offset_minor : p2 + label_offset_minor,
                      "b", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color_corrective, size=size.tiny, textalign=text.align_center))
+                     textcolor=color_corrective_label, size=size.tiny, textalign=text.align_center))
             array.set(minor_corrective_labels, 2, label.new(b3, is_bullish ? p3 + label_offset_minor : p3 - label_offset_minor,
                      "c?", style=label.style_none, color=color.new(color.white, 100),
-                     textcolor=color.new(color_corrective, 50), size=size.tiny, textalign=text.align_center))  // "c?" for uncertain last wave
+                     textcolor=color.new(color_corrective_label, 50), size=size.tiny, textalign=text.align_center))  // "c?" for uncertain last wave
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // IV. HELPER FUNCTIONS (헬퍼 함수)
@@ -804,6 +852,9 @@ f_detect_impulse_wave() =>
         // Check for bullish impulse (starting from low)
         is_bullish = d0 == -1
 
+        // Directional color based on wave direction
+        wave_color = is_bullish ? color_bullish_wave : color_bearish_wave
+
         // Impulse wave rules:
         // - Wave 2 cannot retrace more than 100% of wave 1
         // - Wave 3 cannot be the shortest
@@ -864,30 +915,30 @@ f_detect_impulse_wave() =>
                     label.delete(array.get(legacy_impulse_labels, i))
 
             // Draw impulse wave lines (last wave dashed)
-            array.set(legacy_impulse_lines, 0, line.new(b0, p0, b1, p1, color=color_impulse, width=2, style=line.style_solid))
-            array.set(legacy_impulse_lines, 1, line.new(b1, p1, b2, p2, color=color_impulse, width=2, style=line.style_solid))
-            array.set(legacy_impulse_lines, 2, line.new(b2, p2, b3, p3, color=color_impulse, width=2, style=line.style_solid))
-            array.set(legacy_impulse_lines, 3, line.new(b3, p3, b4, p4, color=color_impulse, width=2, style=line.style_solid))
-            array.set(legacy_impulse_lines, 4, line.new(b4, p4, b5, p5, color=color_impulse, width=2, style=line.style_dashed))  // Last wave dashed
+            array.set(legacy_impulse_lines, 0, line.new(b0, p0, b1, p1, color=wave_color, width=2, style=line.style_solid))
+            array.set(legacy_impulse_lines, 1, line.new(b1, p1, b2, p2, color=wave_color, width=2, style=line.style_solid))
+            array.set(legacy_impulse_lines, 2, line.new(b2, p2, b3, p3, color=wave_color, width=2, style=line.style_solid))
+            array.set(legacy_impulse_lines, 3, line.new(b3, p3, b4, p4, color=wave_color, width=2, style=line.style_solid))
+            array.set(legacy_impulse_lines, 4, line.new(b4, p4, b5, p5, color=wave_color, width=2, style=line.style_dashed))  // Last wave dashed
 
             // Place labels
-            array.set(legacy_impulse_labels, 0, label.new(b1, p1, "①", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse, textcolor=color.white, size=size.normal))
-            array.set(legacy_impulse_labels, 1, label.new(b2, p2, "②", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_impulse, textcolor=color.white, size=size.normal))
-            array.set(legacy_impulse_labels, 2, label.new(b3, p3, "③", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse, textcolor=color.white, size=size.normal))
-            array.set(legacy_impulse_labels, 3, label.new(b4, p4, "④", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_impulse, textcolor=color.white, size=size.normal))
+            array.set(legacy_impulse_labels, 0, label.new(b1, p1, "①", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse_label, textcolor=color.white, size=size.normal))
+            array.set(legacy_impulse_labels, 1, label.new(b2, p2, "②", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_impulse_label, textcolor=color.white, size=size.normal))
+            array.set(legacy_impulse_labels, 2, label.new(b3, p3, "③", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_impulse_label, textcolor=color.white, size=size.normal))
+            array.set(legacy_impulse_labels, 3, label.new(b4, p4, "④", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_impulse_label, textcolor=color.white, size=size.normal))
 
             // Label wave 5 (or 5T if truncated) - uncertain with ?
             if is_truncated and show_truncated
-                array.set(legacy_impulse_labels, 4, label.new(b5, p5, "⑤T?", style=is_bullish ? label.style_label_up : label.style_label_down, color=color.new(color_impulse, 30), textcolor=color.white, size=size.normal))
+                array.set(legacy_impulse_labels, 4, label.new(b5, p5, "⑤T?", style=is_bullish ? label.style_label_up : label.style_label_down, color=color.new(color_impulse_label, 30), textcolor=color.white, size=size.normal))
                 // Add truncation annotation
-                line.new(b3, p3, b5, p5, color=color_impulse, width=1, style=line.style_dashed)
-                label.new(b5, p5 + (is_bullish ? atr_value : -atr_value), "Truncated 5?", style=label.style_none, color=color.new(color.white, 100), textcolor=color.new(color_impulse, 50), size=size.small)
+                line.new(b3, p3, b5, p5, color=wave_color, width=1, style=line.style_dashed)
+                label.new(b5, p5 + (is_bullish ? atr_value : -atr_value), "Truncated 5?", style=label.style_none, color=color.new(color.white, 100), textcolor=color.new(color_impulse_label, 50), size=size.small)
             else
-                array.set(legacy_impulse_labels, 4, label.new(b5, p5, "⑤?", style=is_bullish ? label.style_label_up : label.style_label_down, color=color.new(color_impulse, 30), textcolor=color.white, size=size.normal))
+                array.set(legacy_impulse_labels, 4, label.new(b5, p5, "⑤?", style=is_bullish ? label.style_label_up : label.style_label_down, color=color.new(color_impulse_label, 30), textcolor=color.white, size=size.normal))
 
             // Check and label diagonal
             if is_diagonal and show_diagonal
-                label.new(b3, p3 + (is_bullish ? atr_value * 2 : -atr_value * 2), "Diagonal?", style=label.style_none, color=color.new(color.white, 100), textcolor=color.new(color_impulse, 50), size=size.small)
+                label.new(b3, p3 + (is_bullish ? atr_value * 2 : -atr_value * 2), "Diagonal?", style=label.style_none, color=color.new(color.white, 100), textcolor=color.new(color_impulse_label, 50), size=size.small)
 
             // TIME ANALYSIS WARNING (Glenn Neely - Critical)
             if time_warning and show_alternation
@@ -920,7 +971,7 @@ f_detect_impulse_wave() =>
                 price_02 = p2 - p0
                 slope = bars_02 != 0 ? price_02 / bars_02 : 0
 
-                line.new(b0, p0, b2, p2, color=color.new(color_impulse, 60),
+                line.new(b0, p0, b2, p2, color=color.new(wave_color, 60),
                          width=1, style=line.style_dotted, extend=extend.right)
 
                 bars_to_5 = b5 - b0
@@ -928,11 +979,11 @@ f_detect_impulse_wave() =>
                 parallel_offset = p1 - (p0 + (slope * (b1 - b0)))
                 channel_parallel = channel_target + parallel_offset
 
-                line.new(b1, p1, b5, channel_parallel, color=color.new(color_impulse, 60),
+                line.new(b1, p1, b5, channel_parallel, color=color.new(wave_color, 60),
                          width=1, style=line.style_dotted, extend=extend.right)
 
                 label.new(b5 + 3, channel_parallel, "Ch", style=label.style_none,
-                         textcolor=color.new(color_impulse, 60), size=size.tiny)
+                         textcolor=color.new(color_impulse_label, 60), size=size.tiny)
 
             if show_extension_labels
                 wave1_extended = wave1 > wave3 * 1.618 or wave1 > wave5 * 1.618
@@ -955,12 +1006,12 @@ f_detect_impulse_wave() =>
                 if extension_text != ""
                     label.new(b3, is_bullish ? p3 + atr_value * 2 : p3 - atr_value * 2,
                              extension_text, style=label.style_none,
-                             textcolor=color.new(color_impulse, 30), size=size.small)
+                             textcolor=color.new(color_impulse_label, 30), size=size.small)
 
                 if equality_text != ""
                     label.new(b5 + 5, is_bullish ? p5 + atr_value : p5 - atr_value,
                              equality_text, style=label.style_none,
-                             textcolor=color.new(color_impulse, 40), size=size.tiny)
+                             textcolor=color.new(color_impulse_label, 40), size=size.tiny)
 
 // Detect Corrective Waves (ABC)
 f_detect_corrective_wave() =>
@@ -981,6 +1032,9 @@ f_detect_corrective_wave() =>
         d0 = array.get(zz_direction, size - 4)
         is_bullish = d0 == 1 // Corrective after bullish move
 
+        // Directional color based on wave direction
+        wave_color = is_bullish ? color_bearish_wave : color_bullish_wave  // Reversed because corrections go opposite direction
+
         // Check if this is a completed correction
         waveA = math.abs(p1 - p0)
         waveB = math.abs(p2 - p1)
@@ -996,14 +1050,14 @@ f_detect_corrective_wave() =>
                     label.delete(array.get(legacy_corrective_labels, i))
 
             // Draw corrective wave lines (last wave C is dashed)
-            array.set(legacy_corrective_lines, 0, line.new(b0, p0, b1, p1, color=color_corrective, width=2, style=line.style_solid))
-            array.set(legacy_corrective_lines, 1, line.new(b1, p1, b2, p2, color=color_corrective, width=2, style=line.style_solid))
-            array.set(legacy_corrective_lines, 2, line.new(b2, p2, b3, p3, color=color_corrective, width=2, style=line.style_dashed))  // Last wave dashed
+            array.set(legacy_corrective_lines, 0, line.new(b0, p0, b1, p1, color=wave_color, width=2, style=line.style_solid))
+            array.set(legacy_corrective_lines, 1, line.new(b1, p1, b2, p2, color=wave_color, width=2, style=line.style_solid))
+            array.set(legacy_corrective_lines, 2, line.new(b2, p2, b3, p3, color=wave_color, width=2, style=line.style_dashed))  // Last wave dashed
 
             // Place labels (C is uncertain with ?)
-            array.set(legacy_corrective_labels, 0, label.new(b1, p1, "Ⓐ", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.normal))
-            array.set(legacy_corrective_labels, 1, label.new(b2, p2, "Ⓑ", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective, textcolor=color.white, size=size.normal))
-            array.set(legacy_corrective_labels, 2, label.new(b3, p3, "Ⓒ?", style=is_bullish ? label.style_label_down : label.style_label_up, color=color.new(color_corrective, 30), textcolor=color.white, size=size.normal))
+            array.set(legacy_corrective_labels, 0, label.new(b1, p1, "Ⓐ", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective_label, textcolor=color.white, size=size.normal))
+            array.set(legacy_corrective_labels, 1, label.new(b2, p2, "Ⓑ", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective_label, textcolor=color.white, size=size.normal))
+            array.set(legacy_corrective_labels, 2, label.new(b3, p3, "Ⓒ?", style=is_bullish ? label.style_label_down : label.style_label_up, color=color.new(color_corrective_label, 30), textcolor=color.white, size=size.normal))
 
 // Detect Connecting Waves (WXY)
 f_detect_connecting_wave_wxy() =>
@@ -1028,18 +1082,21 @@ f_detect_connecting_wave_wxy() =>
         d0 = array.get(zz_direction, size - 6)
         is_bullish = d0 == -1
 
+        // Directional color based on wave direction
+        wave_color = is_bullish ? color_bearish_wave : color_bullish_wave  // Reversed because corrections go opposite direction
+
         // WXY structure: W (3 waves), X (connector), Y (3 waves)
         // Simplified: each segment is a corrective structure
 
         // Draw lines
-        line.new(b0, p0, b2, p2, color=color_corrective, width=1, style=line.style_solid)
-        line.new(b2, p2, b4, p4, color=color_corrective, width=1, style=line.style_dashed)
-        line.new(b4, p4, b5, p5, color=color_corrective, width=1, style=line.style_solid)
+        line.new(b0, p0, b2, p2, color=wave_color, width=1, style=line.style_solid)
+        line.new(b2, p2, b4, p4, color=wave_color, width=1, style=line.style_dashed)
+        line.new(b4, p4, b5, p5, color=wave_color, width=1, style=line.style_solid)
 
         // Place labels
-        label.new(b2, p2, "W", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.small)
-        label.new(b3, p3, "X", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective, textcolor=color.white, size=size.small)
-        label.new(b5, p5, "Y", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.small)
+        label.new(b2, p2, "W", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective_label, textcolor=color.white, size=size.small)
+        label.new(b3, p3, "X", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective_label, textcolor=color.white, size=size.small)
+        label.new(b5, p5, "Y", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective_label, textcolor=color.white, size=size.small)
 
 // Detect Triangle Waves (ABCDE)
 f_detect_triangle_wave() =>
@@ -1064,6 +1121,9 @@ f_detect_triangle_wave() =>
         d0 = array.get(zz_direction, size - 6)
         is_bullish = d0 == 1
 
+        // Directional color based on wave direction
+        wave_color = is_bullish ? color_bearish_wave : color_bullish_wave  // Reversed because corrections go opposite direction
+
         // Calculate ranges to detect converging/expanding
         range1 = math.abs(p1 - p0)
         range2 = math.abs(p2 - p1)
@@ -1079,24 +1139,24 @@ f_detect_triangle_wave() =>
 
         if is_converging or is_expanding
             // Draw triangle lines
-            line.new(b0, p0, b1, p1, color=color_corrective, width=1)
-            line.new(b1, p1, b2, p2, color=color_corrective, width=1)
-            line.new(b2, p2, b3, p3, color=color_corrective, width=1)
-            line.new(b3, p3, b4, p4, color=color_corrective, width=1)
-            line.new(b4, p4, b5, p5, color=color_corrective, width=1)
+            line.new(b0, p0, b1, p1, color=wave_color, width=1)
+            line.new(b1, p1, b2, p2, color=wave_color, width=1)
+            line.new(b2, p2, b3, p3, color=wave_color, width=1)
+            line.new(b3, p3, b4, p4, color=wave_color, width=1)
+            line.new(b4, p4, b5, p5, color=wave_color, width=1)
 
             // Place labels
-            label.new(b1, p1, "A", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.small)
-            label.new(b2, p2, "B", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective, textcolor=color.white, size=size.small)
-            label.new(b3, p3, "C", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.small)
-            label.new(b4, p4, "D", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective, textcolor=color.white, size=size.small)
-            label.new(b5, p5, "E", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective, textcolor=color.white, size=size.small)
+            label.new(b1, p1, "A", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective_label, textcolor=color.white, size=size.small)
+            label.new(b2, p2, "B", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective_label, textcolor=color.white, size=size.small)
+            label.new(b3, p3, "C", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective_label, textcolor=color.white, size=size.small)
+            label.new(b4, p4, "D", style=is_bullish ? label.style_label_up : label.style_label_down, color=color_corrective_label, textcolor=color.white, size=size.small)
+            label.new(b5, p5, "E", style=is_bullish ? label.style_label_down : label.style_label_up, color=color_corrective_label, textcolor=color.white, size=size.small)
 
             // Add pattern type label
             if is_expanding
-                label.new(b3, p3 + (is_bullish ? -atr_value * 2 : atr_value * 2), "Expanding Triangle", style=label.style_none, textcolor=color_corrective, size=size.small)
+                label.new(b3, p3 + (is_bullish ? -atr_value * 2 : atr_value * 2), "Expanding Triangle", style=label.style_none, textcolor=color_corrective_label, size=size.small)
             else
-                label.new(b3, p3 + (is_bullish ? -atr_value * 2 : atr_value * 2), "Converging Triangle", style=label.style_none, textcolor=color_corrective, size=size.small)
+                label.new(b3, p3 + (is_bullish ? -atr_value * 2 : atr_value * 2), "Converging Triangle", style=label.style_none, textcolor=color_corrective_label, size=size.small)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // VI. HARMONIC PATTERN DETECTION (하모닉 패턴 탐지)
@@ -1222,26 +1282,29 @@ f_detect_gartley() =>
             line_style = is_gartley ? line.style_solid : line.style_dashed
             pattern_label = is_gartley ? "Gartley" : "Potential Gartley"
 
-            // Draw pattern
-            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
-            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
-            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
-            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
-
-            // Draw XB and AC lines
-            line.new(bx, x, bb, b, color=color.new(color_harmonic, 70), width=1, style=line.style_dotted)
-            line.new(ba, a, bc, c, color=color.new(color_harmonic, 70), width=1, style=line.style_dotted)
-
             is_bullish = a > x
 
-            // Labels
-            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            // Directional color based on pattern direction
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
+            // Draw pattern
+            line.new(bx, x, ba, a, color=pattern_color, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=pattern_color, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=pattern_color, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=pattern_color, width=2, style=line_style)
+
+            // Draw XB and AC lines
+            line.new(bx, x, bb, b, color=color.new(pattern_color, 70), width=1, style=line.style_dotted)
+            line.new(ba, a, bc, c, color=color.new(pattern_color, 70), width=1, style=line.style_dotted)
+
+            // Labels
+            label.new(bx, x, "X", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_gartley_label, size=size.normal)
 
 // Detect Butterfly Pattern
 f_detect_butterfly() =>
@@ -1294,20 +1357,21 @@ f_detect_butterfly() =>
             line_style = is_butterfly ? line.style_solid : line.style_dashed
             pattern_label = is_butterfly ? "Butterfly" : "Potential Butterfly"
 
-            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
-            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
-            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
-            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
-
             is_bullish = a > x
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
 
-            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            line.new(bx, x, ba, a, color=pattern_color, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=pattern_color, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=pattern_color, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=pattern_color, width=2, style=line_style)
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
+            label.new(bx, x, "X", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_butterfly_label, size=size.normal)
 
 // Detect Bat Pattern
 f_detect_bat() =>
@@ -1360,20 +1424,21 @@ f_detect_bat() =>
             line_style = is_bat ? line.style_solid : line.style_dashed
             pattern_label = is_bat ? "Bat" : "Potential Bat"
 
-            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
-            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
-            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
-            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
-
             is_bullish = a > x
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
 
-            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            line.new(bx, x, ba, a, color=pattern_color, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=pattern_color, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=pattern_color, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=pattern_color, width=2, style=line_style)
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
+            label.new(bx, x, "X", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_bat_label, size=size.normal)
 
 // Detect Crab Pattern
 f_detect_crab() =>
@@ -1424,20 +1489,22 @@ f_detect_crab() =>
         if is_crab or is_potential
             line_style = is_crab ? line.style_solid : line.style_dashed
             pattern_label = is_crab ? "Crab" : "Potential Crab"
-            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
-            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
-            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
-            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
 
             is_bullish = a > x
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
 
-            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            line.new(bx, x, ba, a, color=pattern_color, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=pattern_color, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=pattern_color, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=pattern_color, width=2, style=line_style)
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), "Crab", style=label.style_none, textcolor=color_harmonic, size=size.normal)
+            label.new(bx, x, "X", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_crab_label, size=size.normal)
 
 // Detect Shark Pattern
 f_detect_shark() =>
@@ -1485,20 +1552,22 @@ f_detect_shark() =>
         if is_shark or is_potential
             line_style = is_shark ? line.style_solid : line.style_dashed
             pattern_label = is_shark ? "Shark" : "Potential Shark"
-            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
-            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
-            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
-            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
 
             is_bullish = a > x
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
 
-            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            line.new(bx, x, ba, a, color=pattern_color, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=pattern_color, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=pattern_color, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=pattern_color, width=2, style=line_style)
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
+            label.new(bx, x, "X", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_shark_label, size=size.normal)
 
 // Detect Cypher Pattern
 f_detect_cypher() =>
@@ -1544,20 +1613,22 @@ f_detect_cypher() =>
         if is_cypher or is_potential
             line_style = is_cypher ? line.style_solid : line.style_dashed
             pattern_label = is_cypher ? "Cypher" : "Potential Cypher"
-            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
-            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
-            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
-            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
 
             is_bullish = a > x
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
 
-            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            line.new(bx, x, ba, a, color=pattern_color, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=pattern_color, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=pattern_color, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=pattern_color, width=2, style=line_style)
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
+            label.new(bx, x, "X", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_cypher_label, size=size.normal)
 
 // Detect Deep Crab Pattern (Scott Carney)
 f_detect_deep_crab() =>
@@ -1584,7 +1655,7 @@ f_detect_deep_crab() =>
         // Deep Crab ratios (Scott Carney Vol. 3):
         // B point = 0.886 minimum (key differentiator)
         // BC projection = 2.0 - 2.618
-        // XAD = 1.618 (triggers at 1.618 XA projection)
+        // XAD = 1.618 - 1.902 (Deep Crab specific: can extend up to 1.902)
 
         // B must be at least 0.886
         b_min_match = xab >= 0.886 - fib_tolerance_min
@@ -1597,30 +1668,32 @@ f_detect_deep_crab() =>
         bcd_max_tol = f_flexible_tolerance(FIB_2618, FIB_2240, FIB_3000)
         bcd_match = (bcd >= FIB_2000 - bcd_min_tol and bcd <= FIB_2618 + bcd_max_tol)
 
-        xad_match = f_within_flexible_tolerance(xad, FIB_1618, FIB_1414, FIB_2000)
+        xad_match = f_within_flexible_tolerance(xad, FIB_1618, FIB_1414, FIB_1900)
 
         is_deep_crab = b_min_match and abc_match and bcd_match and xad_match
 
         is_potential = (not is_deep_crab) and show_potential and b_min_match and
-                       f_within_tolerance(xad, FIB_1618, fib_tolerance_max * 1.2)
+                       f_within_tolerance(xad, FIB_1618, fib_tolerance_max * 1.5)
 
         if is_deep_crab or is_potential
             line_style = is_deep_crab ? line.style_solid : line.style_dashed
             pattern_label = is_deep_crab ? "Deep Crab" : "Potential Deep Crab"
-            line.new(bx, x, ba, a, color=color_harmonic, width=2, style=line_style)
-            line.new(ba, a, bb, b, color=color_harmonic, width=2, style=line_style)
-            line.new(bb, b, bc, c, color=color_harmonic, width=2, style=line_style)
-            line.new(bc, c, bd, d, color=color_harmonic, width=2, style=line_style)
 
             is_bullish = a > x
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
 
-            label.new(bx, x, "X", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(ba, a, "A", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bb, b, "B", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bc, c, "C", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
-            label.new(bd, d, "D", style=label.style_circle, color=color_harmonic, textcolor=color.white, size=size.small)
+            line.new(bx, x, ba, a, color=pattern_color, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=pattern_color, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=pattern_color, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=pattern_color, width=2, style=line_style)
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_harmonic, size=size.normal)
+            label.new(bx, x, "X", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_deep_crab_label, size=size.normal)
 
 // Detect 5-0 Pattern (Scott Carney - Released 2005)
 f_detect_5_0_pattern() =>
@@ -1663,20 +1736,22 @@ f_detect_5_0_pattern() =>
         if is_5_0 or is_potential
             line_style = is_5_0 ? line.style_solid : line.style_dashed
             pattern_label = is_5_0 ? "5-0" : "Potential 5-0"
-            line.new(bx, x, ba, a, color=color.new(color.purple, 0), width=2, style=line_style)
-            line.new(ba, a, bb, b, color=color.new(color.purple, 0), width=2, style=line_style)
-            line.new(bb, b, bc, c, color=color.new(color.purple, 0), width=2, style=line_style)
-            line.new(bc, c, bd, d, color=color.new(color.purple, 0), width=2, style=line_style)
 
             is_bullish = a > x
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
 
-            label.new(bx, x, "0", style=label.style_circle, color=color.purple, textcolor=color.white, size=size.small)
-            label.new(ba, a, "A", style=label.style_circle, color=color.purple, textcolor=color.white, size=size.small)
-            label.new(bb, b, "B", style=label.style_circle, color=color.purple, textcolor=color.white, size=size.small)
-            label.new(bc, c, "C", style=label.style_circle, color=color.purple, textcolor=color.white, size=size.small)
-            label.new(bd, d, "D", style=label.style_circle, color=color.purple, textcolor=color.white, size=size.small)
+            line.new(bx, x, ba, a, color=pattern_color, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=pattern_color, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=pattern_color, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=pattern_color, width=2, style=line_style)
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color.purple, size=size.normal)
+            label.new(bx, x, "0", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_5_0_label, size=size.normal)
 
 // Detect Shark Pattern - Carney Advanced (Scott Carney - Released 2011)
 f_detect_shark_advanced() =>
@@ -1718,25 +1793,27 @@ f_detect_shark_advanced() =>
         if is_shark_pattern or is_potential
             line_style = is_shark_pattern ? line.style_solid : line.style_dashed
             pattern_label = is_shark_pattern ? "Shark" : "Potential Shark"
-            line.new(bx, x, ba, a, color=color.new(color.teal, 0), width=2, style=line_style)
-            line.new(ba, a, bb, b, color=color.new(color.teal, 0), width=2, style=line_style)
-            line.new(bb, b, bc, c, color=color.new(color.teal, 0), width=2, style=line_style)
-            line.new(bc, c, bd, d, color=color.new(color.teal, 0), width=2, style=line_style)
 
             is_bullish = a > x
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
 
-            label.new(bx, x, "0", style=label.style_circle, color=color.teal, textcolor=color.white, size=size.small)
-            label.new(ba, a, "A", style=label.style_circle, color=color.teal, textcolor=color.white, size=size.small)
-            label.new(bb, b, "B", style=label.style_circle, color=color.teal, textcolor=color.white, size=size.small)
-            label.new(bc, c, "C", style=label.style_circle, color=color.teal, textcolor=color.white, size=size.small)
-            label.new(bd, d, "D", style=label.style_circle, color=color.teal, textcolor=color.white, size=size.small)
+            line.new(bx, x, ba, a, color=pattern_color, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=pattern_color, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=pattern_color, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=pattern_color, width=2, style=line_style)
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color.teal, size=size.normal)
+            label.new(bx, x, "0", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_shark_label, size=size.normal)
 
             // Add 50% retracement reference level (educational)
             target_50 = is_bullish ? d + (c - d) * 0.5 : d - (d - c) * 0.5
-            line.new(bd, d, bd + 10, target_50, color=color.new(color.teal, 50), width=1, style=line.style_dotted, extend=extend.right)
-            label.new(bd + 5, target_50, "50% Level", style=label.style_none, textcolor=color.new(color.teal, 30), size=size.tiny)
+            line.new(bd, d, bd + 10, target_50, color=color.new(pattern_color, 50), width=1, style=line.style_dotted, extend=extend.right)
+            label.new(bd + 5, target_50, "50% Level", style=label.style_none, textcolor=color.new(pattern_color, 30), size=size.tiny)
 
 // Detect Alternate Bat Pattern (Scott Carney Vol 3)
 f_detect_alternate_bat() =>
@@ -1793,21 +1870,21 @@ f_detect_alternate_bat() =>
             line_style = is_alternate_bat ? line.style_solid : line.style_dashed
             pattern_label = is_alternate_bat ? "Alt Bat" : "Potential Alt Bat"
 
-            // Use orange color to distinguish from regular Bat
-            line.new(bx, x, ba, a, color=color.new(color.orange, 0), width=2, style=line_style)
-            line.new(ba, a, bb, b, color=color.new(color.orange, 0), width=2, style=line_style)
-            line.new(bb, b, bc, c, color=color.new(color.orange, 0), width=2, style=line_style)
-            line.new(bc, c, bd, d, color=color.new(color.orange, 0), width=2, style=line_style)
-
             is_bullish = a > x
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
 
-            label.new(bx, x, "X", style=label.style_circle, color=color.orange, textcolor=color.white, size=size.small)
-            label.new(ba, a, "A", style=label.style_circle, color=color.orange, textcolor=color.white, size=size.small)
-            label.new(bb, b, "B", style=label.style_circle, color=color.orange, textcolor=color.white, size=size.small)
-            label.new(bc, c, "C", style=label.style_circle, color=color.orange, textcolor=color.white, size=size.small)
-            label.new(bd, d, "D", style=label.style_circle, color=color.orange, textcolor=color.white, size=size.small)
+            line.new(bx, x, ba, a, color=pattern_color, width=2, style=line_style)
+            line.new(ba, a, bb, b, color=pattern_color, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=pattern_color, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=pattern_color, width=2, style=line_style)
 
-            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color.orange, size=size.normal)
+            label.new(bx, x, "X", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+
+            label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label, style=label.style_none, textcolor=color_alt_bat_label, size=size.normal)
 
 // Detect Three Drives Pattern (Scott Carney Vol 1-3)
 // Three consecutive drives with symmetrical corrections
@@ -1874,23 +1951,24 @@ f_detect_three_drives() =>
             line_style = is_three_drives ? line.style_solid : line.style_dashed
             pattern_label = is_three_drives ? "Three Drives" : "Potential Three Drives"
 
-            // Draw drives
-            line.new(b0, p0, b1, p1, color=color.new(color.lime, 0), width=2, style=line_style)
-            line.new(b1, p1, b2, p2, color=color.new(color.lime, 0), width=2, style=line_style)
-            line.new(b2, p2, b3, p3, color=color.new(color.lime, 0), width=2, style=line_style)
-            line.new(b3, p3, b4, p4, color=color.new(color.lime, 0), width=2, style=line_style)
-            line.new(b4, p4, b5, p5, color=color.new(color.lime, 0), width=2, style=line_style)
-            line.new(b5, p5, b6, p6, color=color.new(color.lime, 0), width=2, style=line_style)
-
             is_bullish = p1 > p0
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
+
+            // Draw drives
+            line.new(b0, p0, b1, p1, color=pattern_color, width=2, style=line_style)
+            line.new(b1, p1, b2, p2, color=pattern_color, width=2, style=line_style)
+            line.new(b2, p2, b3, p3, color=pattern_color, width=2, style=line_style)
+            line.new(b3, p3, b4, p4, color=pattern_color, width=2, style=line_style)
+            line.new(b4, p4, b5, p5, color=pattern_color, width=2, style=line_style)
+            line.new(b5, p5, b6, p6, color=pattern_color, width=2, style=line_style)
 
             // Label drives
-            label.new(b1, p1, "1", style=label.style_circle, color=color.lime, textcolor=color.black, size=size.small)
-            label.new(b3, p3, "2", style=label.style_circle, color=color.lime, textcolor=color.black, size=size.small)
-            label.new(b5, p5, "3", style=label.style_circle, color=color.lime, textcolor=color.black, size=size.small)
+            label.new(b1, p1, "1", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(b3, p3, "2", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(b5, p5, "3", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
 
             label.new(b4, p4 + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label,
-                     style=label.style_none, textcolor=color.lime, size=size.normal,
+                     style=label.style_none, textcolor=color_three_drives_label, size=size.normal,
                      tooltip="Three Drives Pattern\nSymmetrical drives with 61.8-78.6% retracements\nScott Carney Vol 1-3")
 
 // Detect AB=CD Pattern (Standalone - Scott Carney Foundation Pattern)
@@ -1943,21 +2021,22 @@ f_detect_abcd() =>
             pattern_type = perfect_abcd ? "AB=CD" : "AB=CD (Extended)"
             pattern_label = is_abcd ? pattern_type : "Potential " + pattern_type
 
-            // Draw pattern
-            line.new(ba, a, bb, b, color=color.new(color.aqua, 0), width=2, style=line_style)
-            line.new(bb, b, bc, c, color=color.new(color.aqua, 0), width=2, style=line_style)
-            line.new(bc, c, bd, d, color=color.new(color.aqua, 0), width=2, style=line_style)
-
             is_bullish = b > a
+            pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
+
+            // Draw pattern
+            line.new(ba, a, bb, b, color=pattern_color, width=2, style=line_style)
+            line.new(bb, b, bc, c, color=pattern_color, width=2, style=line_style)
+            line.new(bc, c, bd, d, color=pattern_color, width=2, style=line_style)
 
             // Label points
-            label.new(ba, a, "A", style=label.style_circle, color=color.aqua, textcolor=color.black, size=size.small)
-            label.new(bb, b, "B", style=label.style_circle, color=color.aqua, textcolor=color.black, size=size.small)
-            label.new(bc, c, "C", style=label.style_circle, color=color.aqua, textcolor=color.black, size=size.small)
-            label.new(bd, d, "D", style=label.style_circle, color=color.aqua, textcolor=color.black, size=size.small)
+            label.new(ba, a, "A", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bb, b, "B", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bc, c, "C", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
+            label.new(bd, d, "D", style=label.style_circle, color=pattern_color, textcolor=color.white, size=size.small)
 
             label.new(bc, c + (is_bullish ? atr_value * 2 : -atr_value * 2), pattern_label,
-                     style=label.style_none, textcolor=color.aqua, size=size.normal,
+                     style=label.style_none, textcolor=color_abcd_label, size=size.normal,
                      tooltip="AB=CD Pattern\nPerfect price/time symmetry\nFoundation of all harmonic patterns\nScott Carney")
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2006,15 +2085,15 @@ f_detect_bamm() =>
         if bullish_bamm
             label.new(bar_index, low, "BAMM ▲",
                      style=label.style_label_up,
-                     color=color.new(color.fuchsia, 0),
+                     color=color_bullish_harmonic,
                      textcolor=color.white,
                      size=size.normal,
                      tooltip="Bad Action Magnet Move\nExtreme spike with quick reversal\nEducational pattern - Scott Carney")
 
             // Draw spike range box
             box.new(bar_index - lookback, min_low, bar_index, max_high,
-                   border_color=color.new(color.fuchsia, 50),
-                   bgcolor=color.new(color.fuchsia, 90),
+                   border_color=color.new(color_bullish_harmonic, 50),
+                   bgcolor=color.new(color_bullish_harmonic, 90),
                    border_width=1)
 
         // Detect bearish BAMM (upward spike then reversal)
@@ -2027,15 +2106,15 @@ f_detect_bamm() =>
         if bearish_bamm
             label.new(bar_index, high, "BAMM ▼",
                      style=label.style_label_down,
-                     color=color.new(color.fuchsia, 0),
+                     color=color_bearish_harmonic,
                      textcolor=color.white,
                      size=size.normal,
                      tooltip="Bad Action Magnet Move\nExtreme spike with quick reversal\nEducational pattern - Scott Carney")
 
             // Draw spike range box
             box.new(bar_index - lookback, min_low, bar_index, max_high,
-                   border_color=color.new(color.fuchsia, 50),
-                   bgcolor=color.new(color.fuchsia, 90),
+                   border_color=color.new(color_bearish_harmonic, 50),
+                   bgcolor=color.new(color_bearish_harmonic, 90),
                    border_width=1)
 
 // Detect RSI BAMM (RSI + BAMM Combined)
@@ -2075,14 +2154,14 @@ f_detect_rsi_bamm() =>
         if bullish_rsi_bamm
             label.new(bar_index, low, "RSI BAMM ▲\nRSI:" + str.tostring(rsi, "#.#"),
                      style=label.style_label_up,
-                     color=color.new(color.purple, 0),
+                     color=color_bullish_harmonic,
                      textcolor=color.white,
                      size=size.large,
                      tooltip="RSI BAMM - Extreme Bullish Signal\nRSI Oversold + Spike + Recovery\nEducational pattern - Scott Carney Vol 2")
 
             // Draw RSI level line
             line.new(bar_index - 5, low, bar_index + 5, low,
-                    color=color.new(color.purple, 30),
+                    color=color.new(color_bullish_harmonic, 30),
                     width=2,
                     style=line.style_dashed,
                     extend=extend.none)
@@ -2093,14 +2172,14 @@ f_detect_rsi_bamm() =>
         if bearish_rsi_bamm
             label.new(bar_index, high, "RSI BAMM ▼\nRSI:" + str.tostring(rsi, "#.#"),
                      style=label.style_label_down,
-                     color=color.new(color.purple, 0),
+                     color=color_bearish_harmonic,
                      textcolor=color.white,
                      size=size.large,
                      tooltip="RSI BAMM - Extreme Bearish Signal\nRSI Overbought + Spike + Recovery\nEducational pattern - Scott Carney Vol 2")
 
             // Draw RSI level line
             line.new(bar_index - 5, high, bar_index + 5, high,
-                    color=color.new(color.purple, 30),
+                    color=color.new(color_bearish_harmonic, 30),
                     width=2,
                     style=line.style_dashed,
                     extend=extend.none)
@@ -2586,29 +2665,35 @@ f_detect_bump_and_run() =>
 
         // ── VISUALIZE ─────────────────────────────────────────────────────
         if bearish_barr
+            // Directional color based on pattern direction
+            pattern_color = color_bearish_chart_pattern  // Bearish pattern
+
             label.new(bar_index, high, "BARR ▼\nBump-Run",
                      style=label.style_label_down,
-                     color=color.new(color.orange, 0),
+                     color=color.new(color_chart_pattern_label, 0),
                      textcolor=color.white,
                      size=size.normal,
                      tooltip="Bump-and-Run Reversal (Bearish)\nLead-in → Steep Bump → Run Down\n55% success rate (Bulkowski)\nEducational Pattern - NOT a trading signal")
 
             // Draw lead-in trendline projection
             line.new(bar_index - lead_in_len, lead_in_high_start, bar_index, lead_in_high_end,
-                    color=color.new(color.orange, 30),
+                    color=color.new(pattern_color, 30),
                     width=1,
                     style=line.style_dashed)
 
         if bullish_barr
+            // Directional color based on pattern direction
+            pattern_color = color_bullish_chart_pattern  // Bullish pattern
+
             label.new(bar_index, low, "BARR ▲\nDump-Run",
                      style=label.style_label_up,
-                     color=color.new(color.teal, 0),
+                     color=color.new(color_chart_pattern_label, 0),
                      textcolor=color.white,
                      size=size.normal,
                      tooltip="Bump-and-Run Reversal (Bullish / Inverted)\nLead-in → Steep Dump → Run Up\n55% success rate (Bulkowski)\nEducational Pattern - NOT a trading signal")
 
             line.new(bar_index - lead_in_len, lead_in_low_start, bar_index, lead_in_low_end,
-                    color=color.new(color.teal, 30),
+                    color=color.new(pattern_color, 30),
                     width=1,
                     style=line.style_dashed)
 
@@ -2685,6 +2770,9 @@ f_detect_cup_and_handle() =>
         is_potential = (not is_cup_and_handle) and rims_equal and valid_cup_depth and is_u_shaped
 
         if is_cup_and_handle or is_potential
+            // Directional color based on pattern direction
+            pattern_color = color_bullish_chart_pattern  // Bullish pattern
+
             pattern_label = is_cup_and_handle ? "Cup & Handle ▲" : "Potential Cup & Handle"
 
             // Calculate target (Measure Rule)
@@ -2695,26 +2783,26 @@ f_detect_cup_and_handle() =>
             // ── VISUALIZATION ──────────────────────────────────────────
             label.new(bar_index, high, pattern_label,
                      style=label.style_label_up,
-                     color=color.new(color.green, 0),
+                     color=color.new(color_chart_pattern_label, 0),
                      textcolor=color.white,
                      size=size.normal,
                      tooltip="Cup & Handle Pattern\nBullish continuation\n53.6% avg rise (Bulkowski)\nTarget: " + str.tostring(target, "#.##") + " (+" + str.tostring(target_gain, "#.#") + "%)")
 
             // Draw cup (U-shape)
             box.new(bar_index - lookback, left_rim_high, bar_index - cup_low_bar, cup_low,
-                   border_color=color.new(color.green, 50),
-                   bgcolor=color.new(color.green, 95),
+                   border_color=color.new(pattern_color, 50),
+                   bgcolor=color.new(pattern_color, 95),
                    border_width=1)
 
             // Draw handle
             box.new(bar_index - handle_max_bars, handle_start_price, bar_index, handle_low,
-                   border_color=color.new(color.green, 30),
-                   bgcolor=color.new(color.green, 90),
+                   border_color=color.new(pattern_color, 30),
+                   bgcolor=color.new(pattern_color, 90),
                    border_width=2)
 
             // Draw target projection
             line.new(bar_index, close, bar_index + 10, target,
-                    color=color.new(color.green, 0),
+                    color=color.new(pattern_color, 0),
                     width=2,
                     style=line.style_dashed)
 
@@ -3304,6 +3392,12 @@ f_detect_diametric_formation() =>
         wave_d = math.abs(p4 - p3)
         wave_e = math.abs(p5 - p4)
 
+        // Determine pattern direction
+        is_bullish = p1 > p0
+
+        // Directional color based on pattern direction
+        pattern_color = is_bullish ? color_bullish_neowave : color_bearish_neowave
+
         // Critical Diametric Rule: Wave-E becomes larger than Wave-D
         // (violates contracting triangle rules)
         is_diametric = wave_e > wave_d
@@ -3317,35 +3411,34 @@ f_detect_diametric_formation() =>
 
         if is_diametric and not_zigzag
             // Draw Diametric Formation with "bow tie" shape
-            line.new(b0, p0, b1, p1, color=color_neowave, width=2)
-            line.new(b1, p1, b2, p2, color=color_neowave, width=2)
-            line.new(b2, p2, b3, p3, color=color_neowave, width=2)
-            line.new(b3, p3, b4, p4, color=color_neowave, width=2)
-            line.new(b4, p4, b5, p5, color=color_neowave, width=2)
-            line.new(b5, p5, b6, p6, color=color_neowave, width=2)
-            line.new(b6, p6, b7, p7, color=color_neowave, width=2)
+            line.new(b0, p0, b1, p1, color=pattern_color, width=2)
+            line.new(b1, p1, b2, p2, color=pattern_color, width=2)
+            line.new(b2, p2, b3, p3, color=pattern_color, width=2)
+            line.new(b3, p3, b4, p4, color=pattern_color, width=2)
+            line.new(b4, p4, b5, p5, color=pattern_color, width=2)
+            line.new(b5, p5, b6, p6, color=pattern_color, width=2)
+            line.new(b6, p6, b7, p7, color=pattern_color, width=2)
 
             // Label waves A-G
-            is_bullish = p1 > p0
             label.new(b1, p1, "A", style=is_bullish ? label.style_label_up : label.style_label_down,
-                     color=color_neowave, textcolor=color.white, size=size.tiny)
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny)
             label.new(b2, p2, "B", style=is_bullish ? label.style_label_down : label.style_label_up,
-                     color=color_neowave, textcolor=color.white, size=size.tiny)
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny)
             label.new(b3, p3, "C", style=is_bullish ? label.style_label_up : label.style_label_down,
-                     color=color_neowave, textcolor=color.white, size=size.tiny)
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny)
             label.new(b4, p4, "D", style=is_bullish ? label.style_label_down : label.style_label_up,
-                     color=color_neowave, textcolor=color.white, size=size.tiny)
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny)
             label.new(b5, p5, "E", style=is_bullish ? label.style_label_up : label.style_label_down,
-                     color=color_neowave, textcolor=color.white, size=size.tiny)
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny)
             label.new(b6, p6, "F", style=is_bullish ? label.style_label_down : label.style_label_up,
-                     color=color_neowave, textcolor=color.white, size=size.tiny)
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny)
             label.new(b7, p7, "G", style=is_bullish ? label.style_label_up : label.style_label_down,
-                     color=color_neowave, textcolor=color.white, size=size.tiny)
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny)
 
             // Add pattern label
             label.new(b4, p4 + (is_bullish ? atr_value * 3 : -atr_value * 3),
                      "DIAMETRIC\n7-Wave Formation",
-                     style=label.style_none, textcolor=color_neowave, size=size.normal,
+                     style=label.style_none, textcolor=color_neowave_label, size=size.normal,
                      tooltip="NEoWave Diametric: Wave-E > Wave-D, indicating complex correction")
 
 // Detect Extracting Triangle (Glenn Neely - higher highs & higher lows)
@@ -3370,6 +3463,9 @@ f_detect_extracting_triangle() =>
         d0 = array.get(zz_direction, size - 6)
         is_bullish = d0 == -1  // Starting from low
 
+        // Directional color based on pattern direction
+        pattern_color = is_bullish ? color_bullish_neowave : color_bearish_neowave
+
         // CRITICAL RULE: Wave-D ALWAYS larger than Wave-C
         wave_c = math.abs(p3 - p2)
         wave_d = math.abs(p4 - p3)
@@ -3383,28 +3479,28 @@ f_detect_extracting_triangle() =>
 
         if wave_d_larger and extracting_price_action
             // Draw Extracting Triangle
-            line.new(b0, p0, b1, p1, color=color_neowave, width=2)
-            line.new(b1, p1, b2, p2, color=color_neowave, width=2)
-            line.new(b2, p2, b3, p3, color=color_neowave, width=2)
-            line.new(b3, p3, b4, p4, color=color_neowave, width=2)
-            line.new(b4, p4, b5, p5, color=color_neowave, width=2)
+            line.new(b0, p0, b1, p1, color=pattern_color, width=2)
+            line.new(b1, p1, b2, p2, color=pattern_color, width=2)
+            line.new(b2, p2, b3, p3, color=pattern_color, width=2)
+            line.new(b3, p3, b4, p4, color=pattern_color, width=2)
+            line.new(b4, p4, b5, p5, color=pattern_color, width=2)
 
             // Labels
             label.new(b1, p1, "A", style=is_bullish ? label.style_label_down : label.style_label_up,
-                     color=color_neowave, textcolor=color.white, size=size.tiny)
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny)
             label.new(b2, p2, "B", style=is_bullish ? label.style_label_up : label.style_label_down,
-                     color=color_neowave, textcolor=color.white, size=size.tiny)
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny)
             label.new(b3, p3, "C", style=is_bullish ? label.style_label_down : label.style_label_up,
-                     color=color_neowave, textcolor=color.white, size=size.tiny)
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny)
             label.new(b4, p4, "D", style=is_bullish ? label.style_label_up : label.style_label_down,
-                     color=color_neowave, textcolor=color.white, size=size.tiny,
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny,
                      tooltip="Wave-D is ALWAYS larger than Wave-C in Extracting Triangle")
             label.new(b5, p5, "E", style=is_bullish ? label.style_label_down : label.style_label_up,
-                     color=color_neowave, textcolor=color.white, size=size.tiny)
+                     color=color_neowave_label, textcolor=color.white, size=size.tiny)
 
             label.new(b3, p3 + (is_bullish ? atr_value * 2.5 : -atr_value * 2.5),
                      "EXTRACTING △\nHigher Highs & Lows",
-                     style=label.style_none, textcolor=color_neowave, size=size.small)
+                     style=label.style_none, textcolor=color_neowave_label, size=size.small)
 
 // Detect Neutral Triangle (C-wave longest)
 f_detect_neutral_triangle() =>
@@ -3445,9 +3541,12 @@ f_detect_neutral_triangle() =>
             d0 = array.get(zz_direction, size - 6)
             is_bullish = d0 == -1
 
+            // Directional color based on pattern direction
+            pattern_color = is_bullish ? color_bullish_neowave : color_bearish_neowave
+
             label.new(b3, p3 + (is_bullish ? atr_value * 2 : -atr_value * 2),
                      "NEUTRAL △\nC-Wave Extension",
-                     style=label.style_none, textcolor=color_neowave, size=size.small,
+                     style=label.style_none, textcolor=color_neowave_label, size=size.small,
                      tooltip="Neutral Triangle: C-wave longest (like 3rd wave extension)")
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3489,16 +3588,19 @@ f_detect_head_shoulders() =>
             near_horizontal = neckline_slope < 0.15  // Within 15%
 
             if head_highest and shoulder_symmetry and near_horizontal
+                // Directional color based on pattern direction
+                pattern_color = color_bearish_chart_pattern  // Bearish pattern
+
                 // Draw pattern
-                line.new(b0, p0, b1, p1, color=color_chart_pattern, width=2)
-                line.new(b1, p1, b2, p2, color=color_chart_pattern, width=2)
-                line.new(b2, p2, b3, p3, color=color_chart_pattern, width=2)
-                line.new(b3, p3, b4, p4, color=color_chart_pattern, width=2)
-                line.new(b4, p4, b5, p5, color=color_chart_pattern, width=2)
+                line.new(b0, p0, b1, p1, color=pattern_color, width=2)
+                line.new(b1, p1, b2, p2, color=pattern_color, width=2)
+                line.new(b2, p2, b3, p3, color=pattern_color, width=2)
+                line.new(b3, p3, b4, p4, color=pattern_color, width=2)
+                line.new(b4, p4, b5, p5, color=pattern_color, width=2)
 
                 // Draw neckline
                 neckline_price = (p2 + p4) / 2
-                line.new(b2, p2, b4, p4, color=color_chart_pattern, width=1, style=line.style_dashed)
+                line.new(b2, p2, b4, p4, color=pattern_color, width=1, style=line.style_dashed)
 
                 // Calculate target using measure rule
                 pattern_height = p3 - neckline_price
@@ -3506,15 +3608,15 @@ f_detect_head_shoulders() =>
 
                 // Labels
                 label.new(b1, p1, "LS", style=label.style_label_down,
-                         color=color_chart_pattern, textcolor=color.white, size=size.tiny)
+                         color=color_chart_pattern_label, textcolor=color.white, size=size.tiny)
                 label.new(b3, p3, "HEAD", style=label.style_label_down,
-                         color=color_chart_pattern, textcolor=color.white, size=size.normal)
+                         color=color_chart_pattern_label, textcolor=color.white, size=size.normal)
                 label.new(b5, p5, "RS", style=label.style_label_down,
-                         color=color_chart_pattern, textcolor=color.white, size=size.tiny)
+                         color=color_chart_pattern_label, textcolor=color.white, size=size.tiny)
 
                 label.new(b3, p3 + atr_value * 2,
                          "HEAD & SHOULDERS TOP\nProjection: " + str.tostring(target, format.mintick),
-                         style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
+                         style=label.style_none, textcolor=color_chart_pattern_label, size=size.normal,
                          tooltip="Classic reversal pattern | Historical success rate: 83% (Bulkowski)")
 
         // HEAD & SHOULDERS BOTTOM: Head is lowest
@@ -3528,31 +3630,34 @@ f_detect_head_shoulders() =>
             near_horizontal = neckline_slope < 0.15
 
             if head_lowest and shoulder_symmetry and near_horizontal
+                // Directional color based on pattern direction
+                pattern_color = color_bullish_chart_pattern  // Bullish pattern
+
                 // Draw pattern
-                line.new(b0, p0, b1, p1, color=color_chart_pattern, width=2)
-                line.new(b1, p1, b2, p2, color=color_chart_pattern, width=2)
-                line.new(b2, p2, b3, p3, color=color_chart_pattern, width=2)
-                line.new(b3, p3, b4, p4, color=color_chart_pattern, width=2)
-                line.new(b4, p4, b5, p5, color=color_chart_pattern, width=2)
+                line.new(b0, p0, b1, p1, color=pattern_color, width=2)
+                line.new(b1, p1, b2, p2, color=pattern_color, width=2)
+                line.new(b2, p2, b3, p3, color=pattern_color, width=2)
+                line.new(b3, p3, b4, p4, color=pattern_color, width=2)
+                line.new(b4, p4, b5, p5, color=pattern_color, width=2)
 
                 // Draw neckline
                 neckline_price = (p2 + p4) / 2
-                line.new(b2, p2, b4, p4, color=color_chart_pattern, width=1, style=line.style_dashed)
+                line.new(b2, p2, b4, p4, color=pattern_color, width=1, style=line.style_dashed)
 
                 // Calculate target
                 pattern_height = neckline_price - p3
                 target = neckline_price + pattern_height
 
                 label.new(b1, p1, "LS", style=label.style_label_up,
-                         color=color_chart_pattern, textcolor=color.white, size=size.tiny)
+                         color=color_chart_pattern_label, textcolor=color.white, size=size.tiny)
                 label.new(b3, p3, "HEAD", style=label.style_label_up,
-                         color=color_chart_pattern, textcolor=color.white, size=size.normal)
+                         color=color_chart_pattern_label, textcolor=color.white, size=size.normal)
                 label.new(b5, p5, "RS", style=label.style_label_up,
-                         color=color_chart_pattern, textcolor=color.white, size=size.tiny)
+                         color=color_chart_pattern_label, textcolor=color.white, size=size.tiny)
 
                 label.new(b3, p3 - atr_value * 2,
                          "HEAD & SHOULDERS BOTTOM\nProjection: " + str.tostring(target, format.mintick),
-                         style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
+                         style=label.style_none, textcolor=color_chart_pattern_label, size=size.normal,
                          tooltip="Classic reversal pattern | Historical success rate: 87% (Bulkowski)")
 
 // Detect Double Top/Bottom (with Adam & Eve variations)
@@ -3581,6 +3686,9 @@ f_detect_double_patterns() =>
             second_not_higher = p3 <= p1 * 1.01
 
             if peaks_equal and second_not_higher
+                // Directional color based on pattern direction
+                pattern_color = color_bearish_chart_pattern  // Bearish pattern
+
                 // Determine Adam/Eve pattern based on sharpness
                 bars_to_first = b1 - b0
                 bars_to_second = b3 - b2
@@ -3599,7 +3707,7 @@ f_detect_double_patterns() =>
 
                 label.new(b2, p2 + atr_value * 2,
                          "DOUBLE TOP\n" + pattern_type + "\nProjection: " + str.tostring(target, format.mintick),
-                         style=label.style_none, textcolor=color_chart_pattern, size=size.small,
+                         style=label.style_none, textcolor=color_chart_pattern_label, size=size.small,
                          tooltip="Classic reversal pattern | Best: Eve & Eve (Bulkowski)")
 
         // DOUBLE BOTTOM
@@ -3608,6 +3716,9 @@ f_detect_double_patterns() =>
             second_not_lower = p3 >= p1 * 0.99
 
             if valleys_equal and second_not_lower
+                // Directional color based on pattern direction
+                pattern_color = color_bullish_chart_pattern  // Bullish pattern
+
                 bars_to_first = b1 - b0
                 bars_to_second = b3 - b2
 
@@ -3624,7 +3735,7 @@ f_detect_double_patterns() =>
 
                 label.new(b2, p2 - atr_value * 2,
                          "DOUBLE BOTTOM\n" + pattern_type + "\nProjection: " + str.tostring(target, format.mintick),
-                         style=label.style_none, textcolor=color_chart_pattern, size=size.small,
+                         style=label.style_none, textcolor=color_chart_pattern_label, size=size.small,
                          tooltip="Classic reversal pattern | Best: Eve & Eve (Bulkowski)")
 
 // Detect Rectangle Patterns (Bulkowski - High Success Rate)
@@ -3674,11 +3785,14 @@ f_detect_rectangles() =>
             valid_height = height_ratio > 0.05 and height_ratio < 0.15
 
             if support_flat and resistance_flat and valid_height
+                // Directional color based on pattern direction
+                pattern_color = color_bullish_chart_pattern  // Bullish pattern
+
                 // Draw rectangle
-                line.new(b0, support, b5, support, color=color_chart_pattern, width=2, style=line.style_solid)
-                line.new(b0, resistance, b5, resistance, color=color_chart_pattern, width=2, style=line.style_solid)
-                line.new(b0, support, b0, resistance, color=color_chart_pattern, width=1, style=line.style_dotted)
-                line.new(b5, support, b5, resistance, color=color_chart_pattern, width=1, style=line.style_dotted)
+                line.new(b0, support, b5, support, color=pattern_color, width=2, style=line.style_solid)
+                line.new(b0, resistance, b5, resistance, color=pattern_color, width=2, style=line.style_solid)
+                line.new(b0, support, b0, resistance, color=pattern_color, width=1, style=line.style_dotted)
+                line.new(b5, support, b5, resistance, color=pattern_color, width=1, style=line.style_dotted)
 
                 // Calculate target (height of rectangle projected upward)
                 pattern_height = resistance - support
@@ -3686,7 +3800,7 @@ f_detect_rectangles() =>
 
                 label.new(b3, (support + resistance) / 2,
                          "RECTANGLE BOTTOM\nProjection: " + str.tostring(target, format.mintick),
-                         style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
+                         style=label.style_none, textcolor=color_chart_pattern_label, size=size.normal,
                          tooltip="Continuation pattern | Historical success rate: 85% (Bulkowski)")
 
         if d0 == 1  // Starting from peak (Rectangle Top - BEARISH)
@@ -3708,17 +3822,20 @@ f_detect_rectangles() =>
             valid_height = height_ratio > 0.05 and height_ratio < 0.15
 
             if support_flat and resistance_flat and valid_height
-                line.new(b0, support, b5, support, color=color_chart_pattern, width=2, style=line.style_solid)
-                line.new(b0, resistance, b5, resistance, color=color_chart_pattern, width=2, style=line.style_solid)
-                line.new(b0, support, b0, resistance, color=color_chart_pattern, width=1, style=line.style_dotted)
-                line.new(b5, support, b5, resistance, color=color_chart_pattern, width=1, style=line.style_dotted)
+                // Directional color based on pattern direction
+                pattern_color = color_bearish_chart_pattern  // Bearish pattern
+
+                line.new(b0, support, b5, support, color=pattern_color, width=2, style=line.style_solid)
+                line.new(b0, resistance, b5, resistance, color=pattern_color, width=2, style=line.style_solid)
+                line.new(b0, support, b0, resistance, color=pattern_color, width=1, style=line.style_dotted)
+                line.new(b5, support, b5, resistance, color=pattern_color, width=1, style=line.style_dotted)
 
                 pattern_height = resistance - support
                 target = support - pattern_height
 
                 label.new(b3, (support + resistance) / 2,
                          "RECTANGLE TOP\nProjection: " + str.tostring(target, format.mintick),
-                         style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
+                         style=label.style_none, textcolor=color_chart_pattern_label, size=size.normal,
                          tooltip="Continuation pattern | Historical success rate: 80% (Bulkowski)")
 
 // Detect Diamond Patterns (Bulkowski - High Success Rate)
@@ -3766,13 +3883,16 @@ f_detect_diamonds() =>
             middle_largest = swing3 > swing1 and swing3 > swing6
 
             if expanding and contracting and middle_largest
+                // Directional color based on pattern direction
+                pattern_color = color_bullish_chart_pattern  // Bullish pattern
+
                 // Draw diamond shape
-                line.new(b0, p0, b1, p1, color=color_chart_pattern, width=2)
-                line.new(b1, p1, b2, p2, color=color_chart_pattern, width=2)
-                line.new(b2, p2, b3, p3, color=color_chart_pattern, width=2)
-                line.new(b3, p3, b4, p4, color=color_chart_pattern, width=2)
-                line.new(b4, p4, b5, p5, color=color_chart_pattern, width=2)
-                line.new(b5, p5, b6, p6, color=color_chart_pattern, width=2)
+                line.new(b0, p0, b1, p1, color=pattern_color, width=2)
+                line.new(b1, p1, b2, p2, color=pattern_color, width=2)
+                line.new(b2, p2, b3, p3, color=pattern_color, width=2)
+                line.new(b3, p3, b4, p4, color=pattern_color, width=2)
+                line.new(b4, p4, b5, p5, color=pattern_color, width=2)
+                line.new(b5, p5, b6, p6, color=pattern_color, width=2)
 
                 // Calculate target
                 pattern_height = p3 - p0  // From lowest to highest point
@@ -3780,7 +3900,7 @@ f_detect_diamonds() =>
 
                 label.new(b3, p3 + atr_value * 2,
                          "DIAMOND BOTTOM\nProjection: " + str.tostring(target, format.mintick),
-                         style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
+                         style=label.style_none, textcolor=color_chart_pattern_label, size=size.normal,
                          tooltip="Reversal pattern | Historical success rate: 81% (Bulkowski)")
 
         // DIAMOND TOP (Bearish reversal)
@@ -3797,19 +3917,22 @@ f_detect_diamonds() =>
             middle_largest = swing3 > swing1 and swing3 > swing6
 
             if expanding and contracting and middle_largest
-                line.new(b0, p0, b1, p1, color=color_chart_pattern, width=2)
-                line.new(b1, p1, b2, p2, color=color_chart_pattern, width=2)
-                line.new(b2, p2, b3, p3, color=color_chart_pattern, width=2)
-                line.new(b3, p3, b4, p4, color=color_chart_pattern, width=2)
-                line.new(b4, p4, b5, p5, color=color_chart_pattern, width=2)
-                line.new(b5, p5, b6, p6, color=color_chart_pattern, width=2)
+                // Directional color based on pattern direction
+                pattern_color = color_bearish_chart_pattern  // Bearish pattern
+
+                line.new(b0, p0, b1, p1, color=pattern_color, width=2)
+                line.new(b1, p1, b2, p2, color=pattern_color, width=2)
+                line.new(b2, p2, b3, p3, color=pattern_color, width=2)
+                line.new(b3, p3, b4, p4, color=pattern_color, width=2)
+                line.new(b4, p4, b5, p5, color=pattern_color, width=2)
+                line.new(b5, p5, b6, p6, color=pattern_color, width=2)
 
                 pattern_height = p0 - p3  // From highest to lowest point
                 target = p6 - pattern_height
 
                 label.new(b3, p3 - atr_value * 2,
                          "DIAMOND TOP\nProjection: " + str.tostring(target, format.mintick),
-                         style=label.style_none, textcolor=color_chart_pattern, size=size.normal,
+                         style=label.style_none, textcolor=color_chart_pattern_label, size=size.normal,
                          tooltip="Reversal pattern | Historical success rate: 78% (Bulkowski)")
 
 // ═══════════════════════════════════════════════════════════════════════════════
