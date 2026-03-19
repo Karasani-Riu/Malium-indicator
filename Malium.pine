@@ -1261,9 +1261,10 @@ f_detect_gartley() =>
         abc_max_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
         abc_match = (abc >= FIB_0382 - abc_min_tol and abc <= FIB_0886 + abc_max_tol)
 
-        bcd_min_tol = f_flexible_tolerance(FIB_1130, FIB_1000, FIB_1272)
+        // Scott Carney specification: BCD (D of AB) = 1.272-1.618
+        bcd_min_tol = f_flexible_tolerance(FIB_1272, FIB_1130, FIB_1414)
         bcd_max_tol = f_flexible_tolerance(FIB_1618, FIB_1414, FIB_2000)
-        bcd_match = (bcd >= FIB_1130 - bcd_min_tol and bcd <= FIB_1618 + bcd_max_tol)
+        bcd_match = (bcd >= FIB_1272 - bcd_min_tol and bcd <= FIB_1618 + bcd_max_tol)
 
         // ── GARTLEY SPECIFICITY: BC/XA Ratio Check (Scott Carney) ──────────────
         // For a valid Gartley correction pattern, the BC leg must not exceed 1.272 of XA
@@ -1349,11 +1350,12 @@ f_detect_butterfly() =>
         bcd_max_tol = f_flexible_tolerance(FIB_2240, FIB_2000, FIB_2618)
         bcd_match = (bcd >= FIB_1618 - bcd_min_tol and bcd <= FIB_2240 + bcd_max_tol)
 
-        // Strict XAD validation for Butterfly: XAD must EXCEED 1.272 and NOT violate 1.618
-        // Range: 1.272 < XAD <= 1.618 (Scott Carney specification)
-        // XAD > 1.272 ensures clear distinction from Gartley (XAD = 0.786)
+        // Strict XAD validation for Butterfly (Scott Carney specification):
+        // Primary XAD target: 1.27 (most critical measurement)
+        // Alternative XAD target: 1.618
+        // Range: 1.27 <= XAD <= 1.618 (inclusive of 1.27 primary target)
         xad_max_tol = f_flexible_tolerance(FIB_1618, FIB_1618, FIB_1618)  // No upper tolerance
-        xad_match = (xad > FIB_1272 and xad <= FIB_1618 + xad_max_tol)
+        xad_match = (xad >= FIB_1272 and xad <= FIB_1618 + xad_max_tol)
 
         is_butterfly = xab_match and abc_match and bcd_match and xad_match
 
@@ -1531,21 +1533,22 @@ f_detect_shark() =>
         bd = array.get(zz_bar, size - 1)
 
         xab = f_retracement(x, a, b)
-        abc = f_retracement(a, b, c)
+        abc = f_extension(a, b, c)  // Shark uses ABC extension (1.618-2.24), not retracement
         xad = f_extension(x, a, d)
 
-        // Shark ratios with flexible tolerance:
-        // XAB = 0.382 - 0.618
-        // ABC = 1.13 - 1.618
-        // XAD = 0.886 - 1.13
+        // Shark ratios (Scott Carney 2011 specification):
+        // XAB = 0.382 - 0.618 (retracement)
+        // ABC = 1.618 - 2.24 (EXTENSION of AB, Point C at 161.8%-224%)
+        // XAD = 0.886 - 1.13 (88.6% retracement is critical completion point)
 
         xab_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
         xab_max_tol = f_flexible_tolerance(FIB_0618, FIB_0500, FIB_0786)
         xab_match = (xab >= FIB_0382 - xab_min_tol and xab <= FIB_0618 + xab_max_tol)
 
-        abc_min_tol = f_flexible_tolerance(FIB_1130, FIB_1000, FIB_1272)
-        abc_max_tol = f_flexible_tolerance(FIB_1618, FIB_1414, FIB_2000)
-        abc_match = (abc >= FIB_1130 - abc_min_tol and abc <= FIB_1618 + abc_max_tol)
+        // ABC is EXTENSION: 1.618-2.24 (Point C at 161.8%-224% of AB)
+        abc_min_tol = f_flexible_tolerance(FIB_1618, FIB_1414, FIB_2000)
+        abc_max_tol = f_flexible_tolerance(FIB_2240, FIB_2000, FIB_2618)
+        abc_match = (abc >= FIB_1618 - abc_min_tol and abc <= FIB_2240 + abc_max_tol)
 
         xad_min_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
         xad_max_tol = f_flexible_tolerance(FIB_1130, FIB_1000, FIB_1272)
@@ -1660,20 +1663,22 @@ f_detect_deep_crab() =>
         xad = f_extension(x, a, d)
 
         // Deep Crab ratios (Scott Carney Vol. 3):
-        // B point = 0.886 minimum (key differentiator)
-        // BC projection = 2.0 - 2.618
-        // XAD = 1.618 - 1.902 (Deep Crab specific: can extend up to 1.902)
+        // XAB = 0.886 minimum (key differentiator from regular Crab)
+        // ABC = 0.382 - 0.886 (retracement)
+        // BCD = 2.0 - 3.618 (extreme projection: 2.24, 2.618, 3.14, 3.618)
+        // XAD = 1.618 (primary target, can extend to 1.902)
 
-        // B must be at least 0.886
+        // B must be at least 0.886 (minimum requirement)
         b_min_match = xab >= 0.886 - fib_tolerance_min
 
         abc_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
         abc_max_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
         abc_match = (abc >= FIB_0382 - abc_min_tol and abc <= FIB_0886 + abc_max_tol)
 
+        // BCD extreme projections: 2.0 - 3.618 (includes 2.24, 2.618, 3.14, 3.618)
         bcd_min_tol = f_flexible_tolerance(FIB_2000, FIB_1618, FIB_2240)
-        bcd_max_tol = f_flexible_tolerance(FIB_2618, FIB_2240, FIB_3000)
-        bcd_match = (bcd >= FIB_2000 - bcd_min_tol and bcd <= FIB_2618 + bcd_max_tol)
+        bcd_max_tol = f_flexible_tolerance(FIB_3618, FIB_3000, FIB_4236)
+        bcd_match = (bcd >= FIB_2000 - bcd_min_tol and bcd <= FIB_3618 + bcd_max_tol)
 
         xad_match = f_within_flexible_tolerance(xad, FIB_1618, FIB_1414, FIB_1900)
 
@@ -1844,16 +1849,22 @@ f_detect_alternate_bat() =>
         bcd = f_extension(b, c, d)
         xad = f_extension(x, a, d)
 
-        // Alternate Bat ratios (distinct from standard Bat):
-        // B Point: 0.382 maximum (-3% tolerance)
-        // BC: 2.0-3.618 extension (much deeper than regular Bat)
-        // XAD: 0.886-1.13 (extends beyond 0.886)
-        // Uses 1.618 AB=CD structure (not standard AB=CD)
+        // Alternate Bat ratios (Scott Carney 2003 specification):
+        // XAB: 0.382 or less (maximum)
+        // ABC: 0.382-0.886 (retracement of AB)
+        // BCD: minimum 2.0 projection (much deeper than regular Bat)
+        // XAD: 1.13 (defining element in PRZ)
+        // AB=CD: 1.618 extended structure
 
         // B point must be 0.382 or less (tighter than standard Bat)
         xab_match = xab <= FIB_0382 + fib_tolerance_min
 
-        // BC projection is much deeper: 2.0-3.618
+        // ABC retracement: 0.382-0.886 (Scott Carney specification)
+        abc_min_tol = f_flexible_tolerance(FIB_0382, FIB_0236, FIB_0500)
+        abc_max_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
+        abc_match = (abc >= FIB_0382 - abc_min_tol and abc <= FIB_0886 + abc_max_tol)
+
+        // BCD projection is much deeper: 2.0-3.618
         bc_min_tol = f_flexible_tolerance(FIB_2000, FIB_1618, FIB_2240)
         bc_max_tol = f_flexible_tolerance(FIB_3618, FIB_2618, FIB_4236)
         bcd_match = (bcd >= FIB_2000 - bc_min_tol and bcd <= FIB_3618 + bc_max_tol)
@@ -1869,9 +1880,9 @@ f_detect_alternate_bat() =>
         abcd_ratio = cd_length / ab_length
         alternate_abcd = math.abs(abcd_ratio - 1.618) < fib_tolerance_max
 
-        is_alternate_bat = xab_match and bcd_match and xad_match and alternate_abcd
+        is_alternate_bat = xab_match and abc_match and bcd_match and xad_match and alternate_abcd
 
-        is_potential = (not is_alternate_bat) and show_potential and xab_match and xad_match
+        is_potential = (not is_alternate_bat) and show_potential and xab_match and abc_match and xad_match
 
         if is_alternate_bat or is_potential
             line_style = is_alternate_bat ? line.style_solid : line.style_dashed
