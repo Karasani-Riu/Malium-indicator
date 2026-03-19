@@ -1265,16 +1265,16 @@ f_detect_gartley() =>
         bcd_max_tol = f_flexible_tolerance(FIB_1618, FIB_1414, FIB_2000)
         bcd_match = (bcd >= FIB_1130 - bcd_min_tol and bcd <= FIB_1618 + bcd_max_tol)
 
-        // ── GARTLEY SPECIFICITY: BC/XA Ratio Check (Scott Carney) ──────────────
-        // For a valid Gartley correction pattern, the BC leg must not exceed 1.272 of XA
-        // This prevents over-extension and distinguishes Gartley from Butterfly patterns
-        // BXC Ratio = BC leg length / XA leg length
+        // ── GARTLEY SPECIFICITY: BC/BA Ratio Check (Scott Carney) ──────────────
+        // Fibonacci retracement from B to A, then B to C comparison
+        // For a valid Gartley correction: BC must not exceed 1.272 of BA
+        // This ensures proper retracement structure and prevents over-extension
+        ba_length = math.abs(a - b)
         bc_length = math.abs(c - b)
-        xa_length = math.abs(a - x)
-        bc_xa_ratio = xa_length != 0 ? bc_length / xa_length : 0
+        bc_ba_ratio = ba_length != 0 ? bc_length / ba_length : 0
 
-        // BC must not violate 1.272 of XA for valid Gartley correction
-        bc_valid = bc_xa_ratio <= FIB_1272
+        // BC/BA <= 1.272 for valid Gartley correction (BA=BC at 1.272 ratio)
+        bc_valid = bc_ba_ratio <= FIB_1272
 
         is_gartley = xab_match and abc_match and bcd_match and xad_match and bc_valid
 
@@ -1349,11 +1349,11 @@ f_detect_butterfly() =>
         bcd_max_tol = f_flexible_tolerance(FIB_2240, FIB_2000, FIB_2618)
         bcd_match = (bcd >= FIB_1618 - bcd_min_tol and bcd <= FIB_2240 + bcd_max_tol)
 
-        // Strict XAD validation for Butterfly: must be within 1.272-1.618
-        // Pattern will NOT establish if XAD violates this range (Scott Carney specification)
-        xad_min_tol = f_flexible_tolerance(FIB_1272, FIB_1130, FIB_1272)  // Minimal lower tolerance
+        // Strict XAD validation for Butterfly: XAD must EXCEED 1.272 and NOT violate 1.618
+        // Range: 1.272 < XAD <= 1.618 (Scott Carney specification)
+        // XAD > 1.272 ensures clear distinction from Gartley (XAD = 0.786)
         xad_max_tol = f_flexible_tolerance(FIB_1618, FIB_1618, FIB_1618)  // No upper tolerance
-        xad_match = (xad >= FIB_1272 - xad_min_tol and xad <= FIB_1618 + xad_max_tol)
+        xad_match = (xad > FIB_1272 and xad <= FIB_1618 + xad_max_tol)
 
         is_butterfly = xab_match and abc_match and bcd_match and xad_match
 
