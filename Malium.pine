@@ -1246,17 +1246,11 @@ f_detect_gartley() =>
         bcd = f_retracement(b, c, d)
         xad = f_retracement(x, a, d)
 
-        // Additional Gartley specificity: C point validation
-        // XAC measures how far C has moved from the original XA range
-        // For basic Gartley, C must not exceed 1.272 of XA (prevents Butterfly-like extension)
-        xac = math.abs(a - x) != 0 ? math.abs(c - x) / math.abs(a - x) : 0
-
         // Gartley ratios with flexible tolerance:
         // XAB = 0.618 (between 0.5 and 0.786)
         // ABC = 0.382 - 0.886
         // BCD = 1.13 - 1.618
         // XAD = 0.786 (between 0.618 and 1.0)
-        // XAC <= 1.272 (Gartley-specific: prevents excessive C extension)
 
         // Use flexible tolerance for key ratios
         xab_match = f_within_flexible_tolerance(xab, FIB_0618, FIB_0500, FIB_0786)
@@ -1271,11 +1265,18 @@ f_detect_gartley() =>
         bcd_max_tol = f_flexible_tolerance(FIB_1618, FIB_1414, FIB_2000)
         bcd_match = (bcd >= FIB_1130 - bcd_min_tol and bcd <= FIB_1618 + bcd_max_tol)
 
-        // Gartley-specific validation: C must not exceed 1.272 of XA
-        // This distinguishes Gartley from Butterfly (where C can extend beyond X)
-        xac_valid = xac <= FIB_1272
+        // ── GARTLEY SPECIFICITY: BC/XA Ratio Check (Scott Carney) ──────────────
+        // For a valid Gartley correction pattern, the BC leg must not exceed 1.272 of XA
+        // This prevents over-extension and distinguishes Gartley from Butterfly patterns
+        // BXC Ratio = BC leg length / XA leg length
+        bc_length = math.abs(c - b)
+        xa_length = math.abs(a - x)
+        bc_xa_ratio = xa_length != 0 ? bc_length / xa_length : 0
 
-        is_gartley = xab_match and abc_match and bcd_match and xad_match and xac_valid
+        // BC must not violate 1.272 of XA for valid Gartley correction
+        bc_valid = bc_xa_ratio <= FIB_1272
+
+        is_gartley = xab_match and abc_match and bcd_match and xad_match and bc_valid
 
         // Potential pattern with wider tolerance
         is_potential = (not is_gartley) and show_potential and
