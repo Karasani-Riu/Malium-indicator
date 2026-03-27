@@ -1725,25 +1725,43 @@ f_detect_5_0_pattern() =>
         bd = array.get(zz_bar, size - 1)
 
         xab = f_retracement(x, a, b)
+        abc = f_extension(a, b, c)  // BC extension of AB
+        bcd = f_retracement(b, c, d)  // D retracement of BC
         xad = f_retracement(x, a, d)
 
-        // 5-0 Pattern ratios (uses Reciprocal AB=CD):
-        // 0B point = 1.13 - 1.618 (critical validation)
-        // XAD = 0.50 OR 0.618 (dual PRZ levels)
-        // Focus on B point validation + reciprocal AB=CD
+        // 5-0 Pattern ratios (Scott Carney 2007):
+        // 1. AB extension: 1.13-1.618 of XA (OB projection)
+        // 2. BC extension: 1.618-2.24 of AB (CRITICAL - BC must be longest leg)
+        // 3. BCD: 50% retracement of BC (D at 50% of BC)
+        // 4. Reciprocal AB=CD: AB length = CD length
 
-        // Calculate 0B projection (from origin to B)
+        // 1. Calculate OB projection (from origin X to B)
         ob_projection = math.abs((b - x) / (a - x))
         ob_match = (ob_projection >= 1.13 - fib_tolerance_max and ob_projection <= 1.618 + fib_tolerance_max)
 
-        // XAD must be 50% OR 61.8%
+        // 2. BC extension: 1.618-2.24 of AB (defining element)
+        abc_min_tol = f_flexible_tolerance(FIB_1618, FIB_1414, FIB_2000)
+        abc_max_tol = f_flexible_tolerance(FIB_2240, FIB_2000, FIB_2618)
+        abc_match = (abc >= FIB_1618 - abc_min_tol and abc <= FIB_2240 + abc_max_tol)
+
+        // 3. BCD: 50% retracement of BC (D at 50% of BC)
+        bcd_50_match = f_within_flexible_tolerance(bcd, 0.50, 0.382, 0.618)
+
+        // 4. Reciprocal AB=CD: AB length = CD length
+        ab_length = math.abs(b - a)
+        cd_length = math.abs(d - c)
+        abcd_ratio = ab_length != 0 ? cd_length / ab_length : 0.0
+        reciprocal_abcd = math.abs(abcd_ratio - 1.0) < fib_tolerance_max
+
+        // XAD must be 50% OR 61.8% (dual PRZ levels)
         xad_50_match = f_within_flexible_tolerance(xad, 0.50, 0.382, 0.618)
         xad_618_match = f_within_flexible_tolerance(xad, FIB_0618, FIB_0500, FIB_0786)
         xad_match = xad_50_match or xad_618_match
 
-        is_5_0 = ob_match and xad_match
+        // Complete 5-0 validation with all criteria
+        is_5_0 = ob_match and abc_match and bcd_50_match and reciprocal_abcd and xad_match
 
-        is_potential = (not is_5_0) and show_potential and ob_match
+        is_potential = (not is_5_0) and show_potential and ob_match and abc_match
 
         if is_5_0 or is_potential
             line_style = is_5_0 ? line.style_solid : line.style_dashed
@@ -1782,29 +1800,37 @@ f_detect_shark_advanced() =>
         bc = array.get(zz_bar, size - 2)
         bd = array.get(zz_bar, size - 1)
 
-        // Shark is unique - measures 0C extension instead of XAB
-        oc_extension = math.abs((c - x) / (a - x))
-        cd_extension = f_extension(c, d, d)  // Placeholder for reciprocal AB=CD
+        // Shark Advanced - Alternative 0 measurement (precursor to 5-0)
+        // Uses 0C extension instead of traditional XAB retracement
+        // Measures impulsive move from origin (0) through A to C
+
+        xab = f_retracement(x, a, b)
+        oc_extension = math.abs((c - x) / (a - x))  // 0C extension
+        bcd = f_retracement(b, c, d)  // BCD retracement
         xad = f_extension(x, a, d)
 
-        // Shark ratios (precursor to 5-0):
-        // 0C = 1.13 - 1.618 (impulsive extension)
+        // Shark Advanced ratios:
+        // XAB = 0.382 - 0.618 (initial retracement)
+        // 0C = 1.13 - 1.618 (impulsive C extension from origin)
+        // BCD = 0.50 (50% retracement, similar to 5-0)
         // XAD = 0.886 - 1.13 (88.6% + extension convergence)
-        // Initial target = 50% level
 
+        xab_match = (xab >= FIB_0382 - fib_tolerance_max and xab <= FIB_0618 + fib_tolerance_max)
         oc_match = (oc_extension >= 1.13 - fib_tolerance_max and oc_extension <= 1.618 + fib_tolerance_max)
+        bcd_50_match = f_within_flexible_tolerance(bcd, 0.50, 0.382, 0.618)
 
         xad_min_tol = f_flexible_tolerance(FIB_0886, FIB_0786, FIB_1000)
         xad_max_tol = f_flexible_tolerance(FIB_1130, FIB_1000, FIB_1272)
         xad_match = (xad >= FIB_0886 - xad_min_tol and xad <= FIB_1130 + xad_max_tol)
 
-        is_shark_pattern = oc_match and xad_match
+        // Complete Shark Advanced validation
+        is_shark_pattern = xab_match and oc_match and bcd_50_match and xad_match
 
-        is_potential = (not is_shark_pattern) and show_potential and oc_match
+        is_potential = (not is_shark_pattern) and show_potential and oc_match and xad_match
 
         if is_shark_pattern or is_potential
             line_style = is_shark_pattern ? line.style_solid : line.style_dashed
-            pattern_label = is_shark_pattern ? "Shark" : "Potential Shark"
+            pattern_label = is_shark_pattern ? "Shark-A" : "Potential Shark-A"
 
             is_bullish = a > x
             pattern_color = is_bullish ? color_bullish_harmonic : color_bearish_harmonic
