@@ -232,7 +232,7 @@ f_detect_impulse_pattern() =>
         valid_wave2 = f_validate_wave2(p0, p1, p2)
         no_overlap = f_check_overlap(p0, p1, p3, p4)
         has_alternation = f_check_alternation(wave2, wave4, time2, time4)
-        wave3_not_shortest = wave3 > wave1 or wave3 > wave5
+        wave3_not_shortest = wave3 >= wave1 or wave3 >= wave5
 
         // Check for extension
         extending_wave = f_identify_extension(wave1, wave3, wave5)

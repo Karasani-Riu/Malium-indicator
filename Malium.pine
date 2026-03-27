@@ -1486,7 +1486,8 @@ f_detect_crab() =>
         abc_match = (abc >= FIB_0382 - abc_min_tol and abc <= FIB_0886 + abc_max_tol)
 
         bcd_min_tol = f_flexible_tolerance(FIB_2240, FIB_2000, FIB_2618)
-        bcd_match = (bcd >= FIB_2240 - bcd_min_tol)
+        bcd_max_tol = f_flexible_tolerance(FIB_3618, FIB_3140, FIB_4236)
+        bcd_match = (bcd >= FIB_2240 - bcd_min_tol and bcd <= FIB_3618 + bcd_max_tol)
 
         xad_match = f_within_flexible_tolerance(xad, FIB_1618, FIB_1414, FIB_2000)
 
@@ -3036,40 +3037,54 @@ f_detect_wave_failures() =>
 // VIII. DOW THEORY DETECTION (다우 이론 탐지)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Detect Dow Theory Trends
+// Detect Dow Theory Trends (Dow Theory Tenets 1-5)
 f_detect_dow_theory() =>
     if show_dow
-        // Calculate trend using simple moving averages
+        // Calculate trend using simple moving averages (proxy for Primary/Secondary/Minor trends)
         sma_short = ta.sma(close, 20)
         sma_medium = ta.sma(close, 50)
         sma_long = ta.sma(close, 200)
 
-        // Short-term trend
-        short_trend = close > sma_short ? "Bullish" : "Bearish"
-        short_color = close > sma_short ? color.new(color_dow, 70) : color.new(color.red, 70)
+        // Volume confirmation (Dow Theory Tenet 5: Volume Must Confirm the Trend)
+        vol_sma = ta.sma(volume, 20)
+        vol_increasing = volume > vol_sma * 1.1
+        vol_decreasing = volume < vol_sma * 0.9
 
-        // Intermediate trend
-        inter_trend = sma_short > sma_medium ? "Bullish" : "Bearish"
-        inter_color = sma_short > sma_medium ? color.new(color_dow, 50) : color.new(color.red, 50)
+        // Minor Trend (days to weeks) - Price vs SMA 20
+        minor_bullish = close > sma_short
+        minor_vol_confirmed = minor_bullish ? vol_increasing : vol_decreasing
+        minor_trend = minor_bullish ? "Bullish" : "Bearish"
+        minor_trend := minor_vol_confirmed ? minor_trend + " ✓" : minor_trend
+        minor_color = minor_bullish ? color.new(color_dow, 70) : color.new(color.red, 70)
 
-        // Long-term trend
-        long_trend = sma_medium > sma_long ? "Bullish" : "Bearish"
-        long_color = sma_medium > sma_long ? color.new(color_dow, 30) : color.new(color.red, 30)
+        // Secondary Trend (weeks to months) - SMA 20 vs SMA 50
+        secondary_bullish = sma_short > sma_medium
+        secondary_vol_confirmed = secondary_bullish ? vol_increasing : vol_decreasing
+        secondary_trend = secondary_bullish ? "Bullish" : "Bearish"
+        secondary_trend := secondary_vol_confirmed ? secondary_trend + " ✓" : secondary_trend
+        secondary_color = secondary_bullish ? color.new(color_dow, 50) : color.new(color.red, 50)
+
+        // Primary Trend (years) - SMA 50 vs SMA 200
+        primary_bullish = sma_medium > sma_long
+        primary_vol_confirmed = primary_bullish ? vol_increasing : vol_decreasing
+        primary_trend = primary_bullish ? "Bullish" : "Bearish"
+        primary_trend := primary_vol_confirmed ? primary_trend + " ✓" : primary_trend
+        primary_color = primary_bullish ? color.new(color_dow, 30) : color.new(color.red, 30)
 
         // Display trend information at the right edge of chart
         if barstate.islast
             var table dow_table = table.new(position.top_right, 2, 4, border_width=1)
-            table.cell(dow_table, 0, 0, "Dow Theory", bgcolor=color.new(color_dow, 80), text_color=color.white, text_size=size.small)
+            table.cell(dow_table, 0, 0, "Dow Theory (✓ = Vol Confirmed)", bgcolor=color.new(color_dow, 80), text_color=color.white, text_size=size.tiny)
             table.cell(dow_table, 1, 0, "", bgcolor=color.new(color_dow, 80))
 
-            table.cell(dow_table, 0, 1, "Short-Term", text_color=color.white, text_size=size.tiny)
-            table.cell(dow_table, 1, 1, short_trend, bgcolor=short_color, text_color=color.white, text_size=size.tiny)
+            table.cell(dow_table, 0, 1, "Minor", text_color=color.white, text_size=size.tiny)
+            table.cell(dow_table, 1, 1, minor_trend, bgcolor=minor_color, text_color=color.white, text_size=size.tiny)
 
-            table.cell(dow_table, 0, 2, "Intermediate", text_color=color.white, text_size=size.tiny)
-            table.cell(dow_table, 1, 2, inter_trend, bgcolor=inter_color, text_color=color.white, text_size=size.tiny)
+            table.cell(dow_table, 0, 2, "Secondary", text_color=color.white, text_size=size.tiny)
+            table.cell(dow_table, 1, 2, secondary_trend, bgcolor=secondary_color, text_color=color.white, text_size=size.tiny)
 
-            table.cell(dow_table, 0, 3, "Long-Term", text_color=color.white, text_size=size.tiny)
-            table.cell(dow_table, 1, 3, long_trend, bgcolor=long_color, text_color=color.white, text_size=size.tiny)
+            table.cell(dow_table, 0, 3, "Primary", text_color=color.white, text_size=size.tiny)
+            table.cell(dow_table, 1, 3, primary_trend, bgcolor=primary_color, text_color=color.white, text_size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // IX. MASTER PATTERN DETECTION (마스터 패턴 탐지)
@@ -3160,18 +3175,26 @@ f_detect_kondratiev_wave() =>
             kondratiev_phase := "Spring (Recovery)"
             phase_color := color.new(color.green, 70)
             bg_color := color.new(color.green, 95)  // Subtle green tint for Spring
+        else if cycle_position < 0.25 and roc_long <= 0
+            kondratiev_phase := "Winter (Depression)"
+            phase_color := color.new(color.blue, 70)
+            bg_color := color.new(color.blue, 96)  // Subtle blue tint for Winter
         else if cycle_position >= 0.25 and cycle_position < 0.60 and roc_medium > 0
             kondratiev_phase := "Summer (Prosperity)"
             phase_color := color.new(color.yellow, 70)
             bg_color := color.new(color.yellow, 95)  // Subtle yellow tint for Summer
+        else if cycle_position >= 0.25 and cycle_position < 0.60 and roc_medium <= 0
+            kondratiev_phase := "Autumn (Recession)"
+            phase_color := color.new(color.orange, 70)
+            bg_color := color.new(color.orange, 95)  // Subtle orange tint for Autumn (transitioning early)
         else if cycle_position >= 0.60 and roc_long < 0
             kondratiev_phase := "Autumn (Recession)"
             phase_color := color.new(color.orange, 70)
             bg_color := color.new(color.orange, 95)  // Subtle orange tint for Autumn
-        else if cycle_position < 0.25 and roc_long < 0
-            kondratiev_phase := "Winter (Depression)"
-            phase_color := color.new(color.blue, 70)
-            bg_color := color.new(color.blue, 96)  // Subtle blue tint for Winter
+        else  // cycle_position >= 0.60 and roc_long >= 0 (peak holding)
+            kondratiev_phase := "Summer (Prosperity)"
+            phase_color := color.new(color.yellow, 70)
+            bg_color := color.new(color.yellow, 95)  // Subtle yellow tint for Summer (extended peak)
 
         // Display Kondratiev Wave information
         if barstate.islast
