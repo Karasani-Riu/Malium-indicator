@@ -1724,10 +1724,10 @@ f_detect_5_0_pattern() =>
         bc = array.get(zz_bar, size - 2)
         bd = array.get(zz_bar, size - 1)
 
-        xab = f_retracement(x, a, b)
+        // Calculate required ratios for 5-0 pattern
         abc = f_extension(a, b, c)  // BC extension of AB
         bcd = f_retracement(b, c, d)  // D retracement of BC
-        xad = f_retracement(x, a, d)
+        xad = f_retracement(x, a, d)  // XAD retracement
 
         // 5-0 Pattern ratios (Scott Carney 2007):
         // 1. AB extension: 1.13-1.618 of XA (OB projection)
