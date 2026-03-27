@@ -1,0 +1,320 @@
+//@version=6
+strategy("Harmonic Pattern Strategy - Malium", overlay=true,
+         pyramiding=0,
+         initial_capital=10000,
+         default_qty_type=strategy.percent_of_equity,
+         default_qty_value=10,
+         commission_type=strategy.commission.percent,
+         commission_value=0.1)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 📊 HARMONIC PATTERN BACKTEST STRATEGY
+// Based on Malium.pine indicator by Scott Carney specifications
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── ZIGZAG PARAMETERS ──────────────────────────────────────────────────────
+zigzag_length = input.int(10, "ZigZag Length", minval=2, maxval=100, group="ZigZag Settings")
+zigzag_deviation = input.float(5.0, "ZigZag Deviation %", minval=0.5, maxval=20.0, step=0.5, group="ZigZag Settings")
+
+// ── PATTERN SELECTION ──────────────────────────────────────────────────────
+show_gartley = input.bool(true, "Trade Gartley", group="Pattern Selection")
+show_butterfly = input.bool(true, "Trade Butterfly", group="Pattern Selection")
+show_bat = input.bool(true, "Trade Bat", group="Pattern Selection")
+show_crab = input.bool(true, "Trade Crab", group="Pattern Selection")
+show_shark = input.bool(true, "Trade Shark", group="Pattern Selection")
+show_cypher = input.bool(true, "Trade Cypher", group="Pattern Selection")
+show_5_0 = input.bool(true, "Trade 5-0", group="Pattern Selection")
+
+// ── FIBONACCI RATIOS ───────────────────────────────────────────────────────
+FIB_0236 = 0.236
+FIB_0382 = 0.382
+FIB_0500 = 0.500
+FIB_0618 = 0.618
+FIB_0786 = 0.786
+FIB_0886 = 0.886
+FIB_1000 = 1.000
+FIB_1130 = 1.130
+FIB_1272 = 1.272
+FIB_1414 = 1.414
+FIB_1618 = 1.618
+FIB_2000 = 2.000
+FIB_2240 = 2.240
+FIB_2618 = 2.618
+FIB_3140 = 3.140
+FIB_3618 = 3.618
+
+// ── TOLERANCE SYSTEM ───────────────────────────────────────────────────────
+fib_tolerance_max = 0.05
+
+// ── CORE CALCULATION FUNCTIONS ─────────────────────────────────────────────
+f_retracement(leg_start, leg_end, retracement_point) =>
+    leg_length = leg_end - leg_start
+    retracement_length = retracement_point - leg_end
+    leg_length != 0 ? math.abs(retracement_length / leg_length) : 0
+
+f_extension(leg_start, leg_end, extension_point) =>
+    leg_length = leg_end - leg_start
+    extension_length = extension_point - leg_start
+    leg_length != 0 ? math.abs(extension_length / leg_length) : 0
+
+f_flexible_tolerance(fib_level, lower_neighbor, upper_neighbor) =>
+    lower_gap = math.abs(fib_level - lower_neighbor)
+    upper_gap = math.abs(upper_neighbor - fib_level)
+    math.min(lower_gap, upper_gap) * 0.5
+
+f_within_flexible_tolerance(value, target, lower_neighbor, upper_neighbor) =>
+    tolerance = f_flexible_tolerance(target, lower_neighbor, upper_neighbor)
+    math.abs(value - target) <= tolerance
+
+// ── ZIGZAG CALCULATION ─────────────────────────────────────────────────────
+var float zz_price = na
+var int zz_bar = na
+var int zz_direction = 0
+var array<float> zz_price_array = array.new<float>(0)
+var array<int> zz_bar_array = array.new<int>(0)
+
+dev_threshold = close * (zigzag_deviation / 100)
+
+if na(zz_price)
+    zz_price := close
+    zz_bar := bar_index
+    zz_direction := 0
+
+if zz_direction >= 0 and high - zz_price > dev_threshold
+    if zz_direction < 0
+        array.push(zz_price_array, zz_price)
+        array.push(zz_bar_array, zz_bar)
+    zz_price := high
+    zz_bar := bar_index
+    zz_direction := 1
+else if zz_direction <= 0 and zz_price - low > dev_threshold
+    if zz_direction > 0
+        array.push(zz_price_array, zz_price)
+        array.push(zz_bar_array, zz_bar)
+    zz_price := low
+    zz_bar := bar_index
+    zz_direction := -1
+
+if zz_direction == 1 and high > zz_price
+    zz_price := high
+    zz_bar := bar_index
+else if zz_direction == -1 and low < zz_price
+    zz_price := low
+    zz_bar := bar_index
+
+// Keep only last 20 pivots
+if array.size(zz_price_array) > 20
+    array.shift(zz_price_array)
+    array.shift(zz_bar_array)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 📈 PATTERN DETECTION & TRADING LOGIC
+// ══════════════════════════════════════════════════════════════════════════════
+
+var string detected_pattern = ""
+var bool is_bullish_pattern = false
+var float entry_price = na
+var float stop_loss = na
+var float target_1 = na
+var float target_2 = na
+
+size = array.size(zz_price_array)
+
+// Require at least 5 pivots for XABCD patterns
+if size >= 5
+    x = array.get(zz_price_array, size - 5)
+    a = array.get(zz_price_array, size - 4)
+    b = array.get(zz_price_array, size - 3)
+    c = array.get(zz_price_array, size - 2)
+    d = array.get(zz_price_array, size - 1)
+
+    bx = array.get(zz_bar_array, size - 5)
+    ba = array.get(zz_bar_array, size - 4)
+    bb = array.get(zz_bar_array, size - 3)
+    bc = array.get(zz_bar_array, size - 2)
+    bd = array.get(zz_bar_array, size - 1)
+
+    // ── GARTLEY PATTERN ────────────────────────────────────────────────────
+    if show_gartley
+        xab = f_retracement(x, a, b)
+        abc = f_retracement(a, b, c)
+        bcd = f_extension(b, c, d)
+        xad = f_retracement(x, a, d)
+
+        xab_match = (xab >= FIB_0618 - fib_tolerance_max and xab <= FIB_0618 + fib_tolerance_max)
+        abc_match = (abc >= FIB_0382 - fib_tolerance_max and abc <= FIB_0886 + fib_tolerance_max)
+        bcd_match = (bcd >= FIB_1272 - fib_tolerance_max and bcd <= FIB_1618 + fib_tolerance_max)
+        xad_match = (xad >= FIB_0786 - fib_tolerance_max and xad <= FIB_0786 + fib_tolerance_max)
+
+        bc_length = math.abs(c - b)
+        xa_length = math.abs(a - x)
+        bc_valid = xa_length != 0 ? (bc_length / xa_length) <= FIB_1272 : false
+
+        if xab_match and abc_match and bcd_match and xad_match and bc_valid
+            detected_pattern := "Gartley"
+            is_bullish_pattern := a > x
+            entry_price := d
+            stop_loss := is_bullish_pattern ? d - (math.abs(a - x) * 0.382) : d + (math.abs(a - x) * 0.382)
+            target_1 := is_bullish_pattern ? d + (math.abs(d - c)) : d - (math.abs(d - c))
+            target_2 := is_bullish_pattern ? d + (math.abs(d - a) * 0.618) : d - (math.abs(d - a) * 0.618)
+
+    // ── BUTTERFLY PATTERN ──────────────────────────────────────────────────
+    if show_butterfly and detected_pattern == ""
+        xab = f_retracement(x, a, b)
+        abc = f_retracement(a, b, c)
+        bcd = f_extension(b, c, d)
+        xad = f_extension(x, a, d)
+
+        xab_match = (xab >= FIB_0786 - fib_tolerance_max and xab <= FIB_0786 + fib_tolerance_max)
+        abc_match = (abc >= FIB_0382 - fib_tolerance_max and abc <= FIB_0886 + fib_tolerance_max)
+        bcd_match = (bcd >= FIB_1618 - fib_tolerance_max and bcd <= FIB_2618 + fib_tolerance_max)
+        xad_match = (xad >= FIB_1272 and xad <= FIB_1618 + fib_tolerance_max)
+
+        if xab_match and abc_match and bcd_match and xad_match
+            detected_pattern := "Butterfly"
+            is_bullish_pattern := a > x
+            entry_price := d
+            stop_loss := is_bullish_pattern ? d - (math.abs(a - x) * 0.5) : d + (math.abs(a - x) * 0.5)
+            target_1 := is_bullish_pattern ? d + (math.abs(d - c)) : d - (math.abs(d - c))
+            target_2 := is_bullish_pattern ? d + (math.abs(d - a) * 0.618) : d - (math.abs(d - a) * 0.618)
+
+    // ── BAT PATTERN ────────────────────────────────────────────────────────
+    if show_bat and detected_pattern == ""
+        xab = f_retracement(x, a, b)
+        abc = f_retracement(a, b, c)
+        bcd = f_extension(b, c, d)
+        xad = f_retracement(x, a, d)
+
+        xab_match = (xab >= FIB_0382 - fib_tolerance_max and xab <= FIB_0500 + fib_tolerance_max)
+        abc_match = (abc >= FIB_0382 - fib_tolerance_max and abc <= FIB_0886 + fib_tolerance_max)
+        bcd_match = (bcd >= FIB_1618 - fib_tolerance_max and bcd <= FIB_2618 + fib_tolerance_max)
+        xad_match = (xad >= FIB_0886 - fib_tolerance_max and xad <= FIB_0886 + fib_tolerance_max)
+
+        if xab_match and abc_match and bcd_match and xad_match
+            detected_pattern := "Bat"
+            is_bullish_pattern := a > x
+            entry_price := d
+            stop_loss := is_bullish_pattern ? d - (math.abs(a - x) * 0.382) : d + (math.abs(a - x) * 0.382)
+            target_1 := is_bullish_pattern ? d + (math.abs(d - c)) : d - (math.abs(d - c))
+            target_2 := is_bullish_pattern ? d + (math.abs(d - a) * 0.618) : d - (math.abs(d - a) * 0.618)
+
+    // ── CRAB PATTERN ───────────────────────────────────────────────────────
+    if show_crab and detected_pattern == ""
+        xab = f_retracement(x, a, b)
+        abc = f_retracement(a, b, c)
+        bcd = f_extension(b, c, d)
+        xad = f_extension(x, a, d)
+
+        xab_match = (xab >= FIB_0382 - fib_tolerance_max and xab <= FIB_0618 + fib_tolerance_max)
+        abc_match = (abc >= FIB_0382 - fib_tolerance_max and abc <= FIB_0886 + fib_tolerance_max)
+        bcd_match = (bcd >= FIB_2618 - fib_tolerance_max and bcd <= FIB_3618 + fib_tolerance_max)
+        xad_match = (xad >= FIB_1618 - fib_tolerance_max and xad <= FIB_1618 + fib_tolerance_max)
+
+        if xab_match and abc_match and bcd_match and xad_match
+            detected_pattern := "Crab"
+            is_bullish_pattern := a > x
+            entry_price := d
+            stop_loss := is_bullish_pattern ? d - (math.abs(a - x) * 0.5) : d + (math.abs(a - x) * 0.5)
+            target_1 := is_bullish_pattern ? d + (math.abs(d - c)) : d - (math.abs(d - c))
+            target_2 := is_bullish_pattern ? d + (math.abs(d - a) * 0.618) : d - (math.abs(d - a) * 0.618)
+
+    // ── SHARK PATTERN ──────────────────────────────────────────────────────
+    if show_shark and detected_pattern == ""
+        xab = f_retracement(x, a, b)
+        abc = f_extension(a, b, c)
+        xad = f_extension(x, a, d)
+
+        xab_match = (xab >= FIB_0382 - fib_tolerance_max and xab <= FIB_0618 + fib_tolerance_max)
+        abc_match = (abc >= FIB_1618 - fib_tolerance_max and abc <= FIB_2240 + fib_tolerance_max)
+        xad_match = (xad >= FIB_0886 - fib_tolerance_max and xad <= FIB_1130 + fib_tolerance_max)
+
+        if xab_match and abc_match and xad_match
+            detected_pattern := "Shark"
+            is_bullish_pattern := a > x
+            entry_price := d
+            stop_loss := is_bullish_pattern ? d - (math.abs(a - x) * 0.382) : d + (math.abs(a - x) * 0.382)
+            target_1 := is_bullish_pattern ? d + (math.abs(d - c)) : d - (math.abs(d - c))
+            target_2 := is_bullish_pattern ? d + (math.abs(d - a) * 0.5) : d - (math.abs(d - a) * 0.5)
+
+    // ── CYPHER PATTERN ─────────────────────────────────────────────────────
+    if show_cypher and detected_pattern == ""
+        xab = f_retracement(x, a, b)
+        axc = f_extension(a, x, c)
+        bcd = f_retracement(b, c, d)
+        xad = f_retracement(x, a, d)
+
+        xab_match = (xab >= FIB_0382 - fib_tolerance_max and xab <= FIB_0618 + fib_tolerance_max)
+        axc_match = (axc >= FIB_1272 - fib_tolerance_max and axc <= FIB_1414 + fib_tolerance_max)
+        bcd_match = (bcd >= FIB_0786 - fib_tolerance_max and bcd <= FIB_0786 + fib_tolerance_max)
+        xad_match = (xad >= FIB_0786 - fib_tolerance_max and xad <= FIB_0786 + fib_tolerance_max)
+
+        if xab_match and axc_match and bcd_match and xad_match
+            detected_pattern := "Cypher"
+            is_bullish_pattern := a > x
+            entry_price := d
+            stop_loss := is_bullish_pattern ? d - (math.abs(a - x) * 0.382) : d + (math.abs(a - x) * 0.382)
+            target_1 := is_bullish_pattern ? d + (math.abs(d - c)) : d - (math.abs(d - c))
+            target_2 := is_bullish_pattern ? d + (math.abs(d - a) * 0.618) : d - (math.abs(d - a) * 0.618)
+
+    // ── 5-0 PATTERN ────────────────────────────────────────────────────────
+    if show_5_0 and detected_pattern == ""
+        abc = f_extension(a, b, c)
+        bcd = f_retracement(b, c, d)
+        xad = f_retracement(x, a, d)
+
+        ob_projection = math.abs((b - x) / (a - x))
+        ob_match = (ob_projection >= 1.13 - fib_tolerance_max and ob_projection <= 1.618 + fib_tolerance_max)
+        abc_match = (abc >= FIB_1618 - fib_tolerance_max and abc <= FIB_2240 + fib_tolerance_max)
+        bcd_50_match = f_within_flexible_tolerance(bcd, 0.50, 0.382, 0.618)
+
+        ab_length = math.abs(b - a)
+        cd_length = math.abs(d - c)
+        abcd_ratio = ab_length != 0 ? cd_length / ab_length : 0.0
+        reciprocal_abcd = math.abs(abcd_ratio - 1.0) < fib_tolerance_max
+
+        xad_50_match = f_within_flexible_tolerance(xad, 0.50, 0.382, 0.618)
+        xad_618_match = f_within_flexible_tolerance(xad, FIB_0618, FIB_0500, FIB_0786)
+        xad_match = xad_50_match or xad_618_match
+
+        if ob_match and abc_match and bcd_50_match and reciprocal_abcd and xad_match
+            detected_pattern := "5-0"
+            is_bullish_pattern := a > x
+            entry_price := d
+            stop_loss := is_bullish_pattern ? d - (math.abs(a - x) * 0.5) : d + (math.abs(a - x) * 0.5)
+            target_1 := is_bullish_pattern ? d + (math.abs(d - c)) : d - (math.abs(d - c))
+            target_2 := is_bullish_pattern ? d + (math.abs(d - a) * 0.618) : d - (math.abs(d - a) * 0.618)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 📊 STRATEGY EXECUTION
+// ══════════════════════════════════════════════════════════════════════════════
+
+if detected_pattern != "" and strategy.position_size == 0
+    if is_bullish_pattern
+        strategy.entry("Long " + detected_pattern, strategy.long)
+        strategy.exit("Exit Long", "Long " + detected_pattern,
+                     stop=stop_loss,
+                     limit=target_1)
+    else
+        strategy.entry("Short " + detected_pattern, strategy.short)
+        strategy.exit("Exit Short", "Short " + detected_pattern,
+                     stop=stop_loss,
+                     limit=target_1)
+
+    // Visual feedback
+    label.new(bar_index, is_bullish_pattern ? low : high,
+              detected_pattern + (is_bullish_pattern ? " ▲" : " ▼"),
+              color=is_bullish_pattern ? color.new(color.green, 20) : color.new(color.red, 20),
+              textcolor=color.white,
+              style=is_bullish_pattern ? label.style_label_up : label.style_label_down,
+              size=size.normal)
+
+// Reset pattern detection for next bar
+detected_pattern := ""
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 📈 VISUALIZATION
+// ══════════════════════════════════════════════════════════════════════════════
+
+plot(strategy.position_size > 0 ? stop_loss : na, "Stop Loss", color.red, 2, plot.style_cross)
+plot(strategy.position_size > 0 ? target_1 : na, "Target 1", color.green, 2, plot.style_cross)
+plot(strategy.position_size > 0 ? target_2 : na, "Target 2", color.blue, 1, plot.style_cross)
